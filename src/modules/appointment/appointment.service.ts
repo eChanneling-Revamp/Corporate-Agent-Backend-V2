@@ -2,6 +2,7 @@ import { prisma } from '@/config/prisma';
 import { AppError } from '@/middleware/errorHandler';
 import { ResponseUtils } from '@/utils/response';
 import { broadcastAppointmentCreated, broadcastAppointmentUpdate } from '@/utils/websocket';
+import { emailService } from '@/services/emailService';
 import {
   CreateAppointmentInput,
   BulkCreateAppointmentsInput,
@@ -76,6 +77,43 @@ export class AppointmentService {
       ...appointment,
       doctorName: appointment.doctor.name,
     });
+
+    // Send email notifications
+    try {
+      const appointmentData = {
+        patientName: appointment.patientName,
+        patientEmail: appointment.patientEmail,
+        patientPhone: appointment.patientPhone,
+        doctorName: appointment.doctor.name,
+        specialty: appointment.doctor.specialty,
+        hospital: appointment.doctor.hospital,
+        date: appointment.date.toDateString(),
+        time: appointment.timeSlot,
+        appointmentId: appointment.id,
+        amount: appointment.amount,
+        corporateAgent: {
+          companyName: appointment.agent.companyName || 'ABC Insurance Company',
+          email: appointment.agent.email || 'corporateagent@slt.lk'
+        }
+      };
+
+      // Send patient confirmation email
+      console.log('📧 Sending appointment confirmation email...');
+      const patientEmailResult = await emailService.sendAppointmentConfirmation(appointmentData);
+      
+      // Send corporate notification email (optional, can be disabled if not needed)
+      if (process.env.SEND_CORPORATE_NOTIFICATIONS !== 'false') {
+        console.log('📧 Sending corporate notification email...');
+        await emailService.sendCorporateNotification(appointmentData);
+      }
+
+      console.log('✅ Email notifications processed:', { 
+        patient: patientEmailResult.success 
+      });
+    } catch (emailError) {
+      console.error('⚠️ Email sending failed but appointment created:', emailError);
+      // Don't fail the appointment creation if email fails
+    }
 
     return appointment;
   }
@@ -154,6 +192,31 @@ export class AppointmentService {
           });
 
           results.created.push(appointment);
+
+          // Send email notification for each appointment
+          try {
+            const emailData = {
+              patientName: appointment.patientName,
+              patientEmail: appointment.patientEmail,
+              patientPhone: appointment.patientPhone,
+              doctorName: appointment.doctor.name,
+              specialty: appointment.doctor.specialty,
+              hospital: appointment.doctor.hospital,
+              date: appointment.date.toDateString(),
+              time: appointment.timeSlot,
+              appointmentId: appointment.id,
+              amount: appointment.amount,
+              corporateAgent: {
+                companyName: 'ABC Insurance Company',
+                email: 'corporateagent@slt.lk'
+              }
+            };
+
+            console.log(`📧 Sending confirmation email for bulk appointment ${appointment.id}...`);
+            await emailService.sendAppointmentConfirmation(emailData);
+          } catch (emailError) {
+            console.error(`⚠️ Email failed for appointment ${appointment.id}:`, emailError);
+          }
 
         } catch (error) {
           results.failed.push({

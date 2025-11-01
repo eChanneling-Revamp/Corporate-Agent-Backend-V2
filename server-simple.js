@@ -7,6 +7,7 @@ const dotenv = require('dotenv');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
+const emailService = require('./services/emailService');
 
 // Load environment variables
 dotenv.config();
@@ -68,6 +69,75 @@ app.get('/api/test', (req, res) => {
     message: 'API is working',
     timestamp: new Date().toISOString(),
   });
+});
+
+// Email service test endpoint
+app.get('/api/test/email', async (req, res) => {
+  try {
+    console.log('🧪 Testing email configuration...');
+    const testResult = await emailService.testConnection();
+    
+    res.json({
+      success: testResult.success,
+      message: testResult.success ? 'Email service is configured and ready' : 'Email service configuration failed',
+      details: testResult,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Email test error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Email service test failed',
+      error: error.message,
+    });
+  }
+});
+
+// Send test email endpoint
+app.post('/api/test/send-email', async (req, res) => {
+  try {
+    const { to } = req.body;
+    
+    if (!to) {
+      return res.status(400).json({
+        success: false,
+        message: 'Recipient email address is required'
+      });
+    }
+
+    const testAppointmentData = {
+      patientName: 'John Doe',
+      patientEmail: to,
+      patientPhone: '+94771234567',
+      doctorName: 'Dr. Smith Williams',
+      specialty: 'Cardiology',
+      hospital: 'Nawaloka Hospital',
+      date: 'November 2, 2024',
+      time: '2:00 PM',
+      appointmentId: 'TEST-' + Date.now(),
+      amount: 3500,
+      corporateAgent: {
+        companyName: 'ABC Insurance Company',
+        email: 'corporateagent@slt.lk'
+      }
+    };
+
+    console.log('📧 Sending test email to:', to);
+    const emailResult = await emailService.sendAppointmentConfirmation(testAppointmentData);
+
+    res.json({
+      success: emailResult.success,
+      message: emailResult.success ? 'Test email sent successfully' : 'Test email failed',
+      details: emailResult
+    });
+  } catch (error) {
+    console.error('Test email error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Test email failed',
+      error: error.message,
+    });
+  }
 });
 
 // Doctors endpoint - serving real Neon PostgreSQL data
@@ -380,6 +450,307 @@ app.post('/api/auth/logout', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Logout failed',
+      error: error.message,
+    });
+  }
+});
+
+// Missing API endpoints that frontend expects
+app.get('/api/appointments/unpaid', async (req, res) => {
+  try {
+    const appointments = await prisma.appointment.findMany({
+      where: {
+        OR: [
+          { payment: null },
+          { payment: { status: 'PENDING' } }
+        ]
+      },
+      include: {
+        doctor: true,
+        payment: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    const transformedAppointments = appointments.map((appointment) => ({
+      id: appointment.id,
+      doctorName: appointment.doctor.name,
+      specialty: appointment.doctor.specialty,
+      hospital: appointment.doctor.hospital,
+      patientName: appointment.patientName,
+      patientEmail: appointment.patientEmail,
+      patientPhone: appointment.patientPhone,
+      date: appointment.date.toISOString().split('T')[0],
+      time: appointment.timeSlot,
+      status: appointment.status.toLowerCase(),
+      amount: appointment.amount,
+      paymentStatus: appointment.payment ? appointment.payment.status.toLowerCase() : 'pending',
+      notes: appointment.notes || '',
+      createdAt: appointment.createdAt
+    }));
+
+    res.json(transformedAppointments);
+  } catch (error) {
+    console.error('Database error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch unpaid appointments',
+      error: error.message,
+    });
+  }
+});
+
+app.post('/api/appointments', async (req, res) => {
+  try {
+    console.log('Creating new appointment:', req.body);
+    const { doctorId, patientName, patientEmail, patientPhone, date, timeSlot, amount, paymentMethod } = req.body;
+    
+    // Get agent from token (simplified for demo)
+    const agent = await prisma.agent.findFirst();
+    
+    const appointment = await prisma.appointment.create({
+      data: {
+        agentId: agent.id,
+        doctorId,
+        patientName,
+        patientEmail,
+        patientPhone,
+        date: new Date(date),
+        timeSlot,
+        amount: parseFloat(amount),
+        status: 'CONFIRMED'
+      },
+      include: {
+        doctor: true
+      }
+    });
+
+    // Send email notifications
+    try {
+      const appointmentData = {
+        patientName: appointment.patientName,
+        patientEmail: appointment.patientEmail,
+        patientPhone: appointment.patientPhone,
+        doctorName: appointment.doctor.name,
+        specialty: appointment.doctor.specialty,
+        hospital: appointment.doctor.hospital,
+        date: appointment.date.toDateString(),
+        time: appointment.timeSlot,
+        appointmentId: appointment.id,
+        amount: appointment.amount,
+        corporateAgent: {
+          companyName: agent.companyName || 'ABC Insurance Company',
+          email: agent.email || 'corporateagent@slt.lk'
+        }
+      };
+
+      // Send patient confirmation email
+      console.log('📧 Sending appointment confirmation email...');
+      const patientEmailResult = await emailService.sendAppointmentConfirmation(appointmentData);
+      
+      // Send corporate notification email
+      console.log('📧 Sending corporate notification email...');
+      const corporateEmailResult = await emailService.sendCorporateNotification(appointmentData);
+
+      console.log('✅ Email notifications processed:', { 
+        patient: patientEmailResult.success, 
+        corporate: corporateEmailResult.success 
+      });
+    } catch (emailError) {
+      console.error('⚠️ Email sending failed but appointment created:', emailError);
+      // Don't fail the appointment creation if email fails
+    }
+
+    res.json({
+      success: true,
+      message: 'Appointment created successfully',
+      data: appointment
+    });
+  } catch (error) {
+    console.error('Appointment creation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create appointment',
+      error: error.message,
+    });
+  }
+});
+
+app.post('/api/appointments/bulk', async (req, res) => {
+  try {
+    console.log('Creating bulk appointments:', req.body);
+    const appointments = req.body;
+    const agent = await prisma.agent.findFirst();
+    
+    const createdAppointments = [];
+    let emailsSent = 0;
+    
+    for (const appt of appointments) {
+      const doctor = await prisma.doctor.findFirst({
+        where: { name: appt.doctorName }
+      });
+      
+      if (doctor) {
+        const appointment = await prisma.appointment.create({
+          data: {
+            agentId: agent.id,
+            doctorId: doctor.id,
+            patientName: appt.patientName,
+            patientEmail: appt.patientEmail,
+            patientPhone: appt.patientPhone,
+            date: new Date(appt.date),
+            timeSlot: appt.time,
+            amount: doctor.consultationFee,
+            status: 'CONFIRMED'
+          },
+          include: { doctor: true }
+        });
+        
+        createdAppointments.push(appointment);
+
+        // Send email notification for each appointment
+        try {
+          const appointmentData = {
+            patientName: appointment.patientName,
+            patientEmail: appointment.patientEmail,
+            patientPhone: appointment.patientPhone,
+            doctorName: appointment.doctor.name,
+            specialty: appointment.doctor.specialty,
+            hospital: appointment.doctor.hospital,
+            date: appointment.date.toDateString(),
+            time: appointment.timeSlot,
+            appointmentId: appointment.id,
+            amount: appointment.amount,
+            corporateAgent: {
+              companyName: agent.companyName || 'ABC Insurance Company',
+              email: agent.email || 'corporateagent@slt.lk'
+            }
+          };
+
+          console.log(`📧 Sending confirmation email for appointment ${appointment.id}...`);
+          const emailResult = await emailService.sendAppointmentConfirmation(appointmentData);
+          if (emailResult.success) {
+            emailsSent++;
+          }
+        } catch (emailError) {
+          console.error(`⚠️ Email failed for appointment ${appointment.id}:`, emailError);
+        }
+      }
+    }
+
+    console.log(`✅ Bulk creation complete: ${createdAppointments.length} appointments, ${emailsSent} emails sent`);
+
+    res.json({
+      success: true,
+      message: `${createdAppointments.length} appointments created successfully`,
+      data: createdAppointments,
+      emailNotifications: {
+        sent: emailsSent,
+        total: createdAppointments.length
+      }
+    });
+  } catch (error) {
+    console.error('Bulk appointment creation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create bulk appointments',
+      error: error.message,
+    });
+  }
+});
+
+app.put('/api/appointments/confirm/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const appointment = await prisma.appointment.update({
+      where: { id },
+      data: { status: 'CONFIRMED' },
+      include: { doctor: true }
+    });
+
+    res.json({
+      success: true,
+      message: 'Appointment confirmed successfully',
+      data: appointment
+    });
+  } catch (error) {
+    console.error('Appointment confirmation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to confirm appointment',
+      error: error.message,
+    });
+  }
+});
+
+app.delete('/api/appointments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    
+    const appointment = await prisma.appointment.update({
+      where: { id },
+      data: { 
+        status: 'CANCELLED',
+        cancelReason: reason
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Appointment cancelled successfully',
+      data: appointment
+    });
+  } catch (error) {
+    console.error('Appointment cancellation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to cancel appointment',
+      error: error.message,
+    });
+  }
+});
+
+app.get('/api/profile', async (req, res) => {
+  try {
+    const agent = await prisma.agent.findFirst({
+      include: { user: true }
+    });
+
+    res.json({
+      success: true,
+      data: agent
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch profile',
+      error: error.message,
+    });
+  }
+});
+
+app.put('/api/profile', async (req, res) => {
+  try {
+    const agent = await prisma.agent.findFirst();
+    const updatedAgent = await prisma.agent.update({
+      where: { id: agent.id },
+      data: req.body,
+      include: { user: true }
+    });
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: updatedAgent
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update profile',
       error: error.message,
     });
   }
