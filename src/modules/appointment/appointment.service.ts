@@ -84,13 +84,16 @@ export class AppointmentService {
    * Bulk create appointments
    */
   static async bulkCreateAppointments(agentId: string, data: BulkCreateAppointmentsInput) {
-    const results = {
+    const results: {
+      created: any[];
+      failed: Array<{ data: any; error: string }>;
+    } = {
       created: [],
       failed: [],
     };
 
     // Process appointments in transaction for consistency
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       for (const appointmentData of data.appointments) {
         try {
           // Verify doctor exists and is active
@@ -407,16 +410,51 @@ export class AppointmentService {
     data: CancelAppointmentInput,
     agentId?: string
   ) {
-    const result = await this.updateAppointment(
-      appointmentId,
-      { 
+    const where: any = { id: appointmentId };
+    
+    if (agentId) {
+      where.agentId = agentId;
+    }
+
+    const existingAppointment = await prisma.appointment.findUnique({
+      where,
+    });
+
+    if (!existingAppointment) {
+      throw new AppError('Appointment not found', 404);
+    }
+
+    const updatedAppointment = await prisma.appointment.update({
+      where: { id: appointmentId },
+      data: {
         status: 'CANCELLED',
         cancelReason: data.reason,
+        updatedAt: new Date(),
       },
-      agentId
-    );
+      include: {
+        doctor: {
+          select: {
+            id: true,
+            name: true,
+            specialty: true,
+            hospital: true,
+          },
+        },
+        agent: {
+          select: {
+            id: true,
+            name: true,
+            companyName: true,
+          },
+        },
+        payment: true,
+      },
+    });
 
-    return result;
+    // Broadcast update
+    broadcastAppointmentUpdate(updatedAppointment);
+
+    return updatedAppointment;
   }
 
   /**

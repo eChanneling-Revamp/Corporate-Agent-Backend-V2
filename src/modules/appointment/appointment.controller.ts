@@ -15,7 +15,7 @@ export class AppointmentController {
    */
   static async createAppointment(req: Request, res: Response) {
     try {
-      const data = createAppointmentSchema.parse(req.body);
+      const { body: data } = createAppointmentSchema.parse({ body: req.body });
       const agentId = req.user!.id;
 
       const appointment = await AppointmentService.createAppointment(agentId, data);
@@ -31,7 +31,7 @@ export class AppointmentController {
    */
   static async bulkCreateAppointments(req: Request, res: Response) {
     try {
-      const data = bulkCreateAppointmentsSchema.parse(req.body);
+      const { body: data } = bulkCreateAppointmentsSchema.parse({ body: req.body });
       const agentId = req.user!.id;
 
       const results = await AppointmentService.bulkCreateAppointments(agentId, data);
@@ -52,7 +52,7 @@ export class AppointmentController {
    */
   static async listAppointments(req: Request, res: Response) {
     try {
-      const query = listAppointmentsSchema.parse(req.query);
+      const { query } = listAppointmentsSchema.parse({ query: req.query });
       const agentId = req.user!.id;
       const isAdmin = req.user!.role === 'ADMIN';
 
@@ -86,7 +86,7 @@ export class AppointmentController {
   static async updateAppointment(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const data = updateAppointmentSchema.parse(req.body);
+      const { body: data } = updateAppointmentSchema.parse({ params: req.params, body: req.body });
       const agentId = req.user!.role === 'ADMIN' ? undefined : req.user!.id;
 
       const appointment = await AppointmentService.updateAppointment(id, data, agentId);
@@ -119,7 +119,7 @@ export class AppointmentController {
   static async cancelAppointment(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const data = cancelAppointmentSchema.parse(req.body);
+      const { body: data } = cancelAppointmentSchema.parse({ params: req.params, body: req.body });
       const agentId = req.user!.role === 'ADMIN' ? undefined : req.user!.id;
 
       const appointment = await AppointmentService.cancelAppointment(id, data, agentId);

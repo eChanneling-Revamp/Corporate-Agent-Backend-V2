@@ -7,16 +7,17 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 
 // Import middleware
-import { errorHandler, notFoundHandler } from '@/middleware/errorHandler';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 // Import routes
-import authRoutes from '@/modules/auth/auth.routes';
-import agentRoutes from '@/modules/agent/agent.routes';
-import doctorRoutes from '@/modules/doctor/doctor.routes';
-import appointmentRoutes from '@/modules/appointment/appointment.routes';
-import paymentRoutes from '@/modules/payment/payment.routes';
-import reportRoutes from '@/modules/report/report.routes';
-import profileRoutes from '@/modules/profile/profile.routes';
+import authRoutes from './modules/auth/auth.routes';
+import agentRoutes from './modules/agent/agent.routes';
+import doctorRoutes from './modules/doctor/doctor.routes';
+import appointmentRoutes from './modules/appointment/appointment.routes';
+// Note: These routes will be added as we implement the modules
+// import paymentRoutes from './modules/payment/payment.routes';
+// import reportRoutes from './modules/report/report.routes';
+// import profileRoutes from './modules/profile/profile.routes';
 
 // Load environment variables
 dotenv.config();
@@ -80,9 +81,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/agents', agentRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/appointments', appointmentRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/profile', profileRoutes);
+// TODO: Add these routes as modules are implemented
+// app.use('/api/payments', paymentRoutes);
+// app.use('/api/reports', reportRoutes);
+// app.use('/api/profile', profileRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

@@ -41,10 +41,9 @@ async function main() {
       userId: agentUser.id,
       name: 'John Smith',
       companyName: 'Corporate Health Solutions Ltd',
+      email: 'agent@corporate.com',
       phone: '+94771234567',
       address: '123 Business District, Colombo 03',
-      registrationNumber: 'CHS001',
-      contactPerson: 'John Smith',
       isActive: true,
     },
   });
@@ -60,12 +59,15 @@ async function main() {
       phone: '+94112345678',
       email: 'saman.perera@echannelling.com',
       consultationFee: 3000,
-      availability: {
+      rating: 4.8,
+      description: 'Experienced cardiologist with 15+ years of practice',
+      availableDates: {
         monday: ['09:00', '10:00', '11:00', '14:00', '15:00'],
         tuesday: ['09:00', '10:00', '11:00', '14:00', '15:00'],
         wednesday: ['09:00', '10:00', '11:00'],
         friday: ['14:00', '15:00', '16:00'],
       },
+      isActive: true,
     },
     {
       name: 'Dr. Nimal Fernando',
@@ -74,12 +76,15 @@ async function main() {
       phone: '+94112345679',
       email: 'nimal.fernando@echannelling.com',
       consultationFee: 2500,
-      availability: {
+      rating: 4.6,
+      description: 'Specialist in skin conditions and cosmetic treatments',
+      availableDates: {
         monday: ['08:00', '09:00', '10:00'],
         wednesday: ['08:00', '09:00', '10:00', '14:00'],
         thursday: ['14:00', '15:00', '16:00'],
         saturday: ['08:00', '09:00', '10:00'],
       },
+      isActive: true,
     },
     {
       name: 'Dr. Kamala Silva',
@@ -88,12 +93,15 @@ async function main() {
       phone: '+94112345680',
       email: 'kamala.silva@echannelling.com',
       consultationFee: 2800,
-      availability: {
+      rating: 4.9,
+      description: 'Pediatric specialist focusing on child healthcare',
+      availableDates: {
         tuesday: ['09:00', '10:00', '11:00', '15:00'],
         thursday: ['09:00', '10:00', '11:00', '15:00'],
         friday: ['09:00', '10:00', '11:00'],
         saturday: ['09:00', '10:00', '11:00'],
       },
+      isActive: true,
     },
     {
       name: 'Dr. Rajesh Gupta',
@@ -102,21 +110,30 @@ async function main() {
       phone: '+94112345681',
       email: 'rajesh.gupta@echannelling.com',
       consultationFee: 4000,
-      availability: {
+      rating: 4.7,
+      description: 'Orthopedic surgeon specializing in joint replacements',
+      availableDates: {
         monday: ['15:00', '16:00', '17:00'],
         wednesday: ['15:00', '16:00', '17:00'],
         friday: ['15:00', '16:00', '17:00'],
       },
+      isActive: true,
     },
   ];
 
   for (const doctorData of doctors) {
-    const doctor = await prisma.doctor.upsert({
+    const existingDoctor = await prisma.doctor.findFirst({
       where: { email: doctorData.email },
-      update: {},
-      create: doctorData,
     });
-    console.log('👨‍⚕️ Created doctor:', doctor.name);
+
+    if (!existingDoctor) {
+      const doctor = await prisma.doctor.create({
+        data: doctorData,
+      });
+      console.log('👨‍⚕️ Created doctor:', doctor.name);
+    } else {
+      console.log('👨‍⚕️ Doctor already exists:', existingDoctor.name);
+    }
   }
 
   // Create sample appointments
@@ -156,10 +173,16 @@ async function main() {
   await prisma.auditLog.create({
     data: {
       action: 'SEED_DATABASE',
-      entityType: 'SYSTEM',
-      details: {
+      entity: 'SYSTEM',
+      newData: {
         message: 'Database seeded with initial data',
         timestamp: new Date(),
+        recordsCreated: {
+          users: 2,
+          agents: 1,
+          doctors: 4,
+          appointments: 2,
+        },
       },
     },
   });

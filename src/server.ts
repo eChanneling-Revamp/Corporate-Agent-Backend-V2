@@ -1,7 +1,7 @@
 import { createServer } from 'http';
 import app from './app';
-import { initWebSocket } from '@/utils/websocket';
-import { prisma } from '@/config/prisma';
+import { initWebSocket } from './utils/websocket';
+import { prisma } from './config/prisma';
 
 const PORT = process.env.PORT || 3001;
 const WS_PORT = process.env.WS_PORT || 3002;

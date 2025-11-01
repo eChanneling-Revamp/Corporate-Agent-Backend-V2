@@ -7,8 +7,8 @@ export class ResponseUtils {
    */
   static success<T>(
     res: Response,
+    data: T,
     message: string,
-    data?: T,
     statusCode: number = 200
   ): Response {
     const response: ApiResponse<T> = {
@@ -166,5 +166,37 @@ export class ResponseUtils {
    */
   static getPaginationSkip(page: number = 1, limit: number = 10): number {
     return Math.max(0, (page - 1) * limit);
+  }
+
+  /**
+   * Handle and format error responses
+   */
+  static handleError(error: any, res: Response): Response {
+    console.error('Error occurred:', error);
+
+    if (error.name === 'ZodError') {
+      const errorMessage = error.errors
+        .map((err: any) => `${err.path.join('.')}: ${err.message}`)
+        .join(', ');
+      return this.badRequest(res, `Validation error: ${errorMessage}`);
+    }
+
+    if (error.name === 'PrismaClientKnownRequestError') {
+      switch (error.code) {
+        case 'P2002':
+          return this.conflict(res, 'A record with this data already exists');
+        case 'P2025':
+          return this.notFound(res, 'Record not found');
+        default:
+          return this.internalError(res, 'Database operation failed');
+      }
+    }
+
+    if (error.message) {
+      const statusCode = error.statusCode || 500;
+      return this.error(res, error.message, statusCode);
+    }
+
+    return this.internalError(res, 'An unexpected error occurred');
   }
 }

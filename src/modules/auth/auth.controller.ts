@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { ResponseUtils } from '@/utils/response';
-import { asyncHandler } from '@/middleware/errorHandler';
+import { ResponseUtils } from '../../utils/response';
 import {
   LoginInput,
   RegisterInput,
