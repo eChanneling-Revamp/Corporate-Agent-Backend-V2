@@ -1,12 +1,12 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import compression from 'compression';
-import dotenv from 'dotenv';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const compression = require('compression');
+const dotenv = require('dotenv');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { PrismaClient } = require('@prisma/client');
 
 // Load environment variables
 dotenv.config();
@@ -84,7 +84,7 @@ app.get('/api/doctors', async (req, res) => {
     console.log(`Found ${doctors.length} doctors in database`);
 
     // Transform database doctors to frontend format
-    const transformedDoctors = doctors.map((doctor: any) => ({
+    const transformedDoctors = doctors.map((doctor) => ({
       id: doctor.id,
       name: doctor.name,
       specialty: doctor.specialty,
@@ -114,7 +114,7 @@ app.get('/api/doctors', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch doctors from database',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error.message,
     });
   }
 });
@@ -137,7 +137,7 @@ app.get('/api/appointments', async (req, res) => {
     console.log(`Found ${appointments.length} appointments in database`);
 
     // Transform database appointments to frontend format
-    const transformedAppointments = appointments.map((appointment: any) => ({
+    const transformedAppointments = appointments.map((appointment) => ({
       id: appointment.id,
       doctorName: appointment.doctor.name,
       specialty: appointment.doctor.specialty,
@@ -160,7 +160,7 @@ app.get('/api/appointments', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch appointments from database',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error.message,
     });
   }
 });
@@ -208,7 +208,7 @@ app.get('/api/dashboard', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch dashboard stats from database',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error.message,
     });
   }
 });
@@ -234,7 +234,7 @@ app.get('/api/payments', async (req, res) => {
     console.log(`Found ${payments.length} payments in database`);
 
     // Transform database payments to frontend format
-    const transformedPayments = payments.map((payment: any) => ({
+    const transformedPayments = payments.map((payment) => ({
       id: payment.id,
       appointmentId: payment.appointment?.id || 'N/A',
       transactionId: payment.transactionId || `TXN-${payment.id.slice(0, 8)}`,
@@ -252,7 +252,7 @@ app.get('/api/payments', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch payments from database',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error.message,
     });
   }
 });
@@ -311,13 +311,13 @@ app.post('/api/auth/login', async (req, res) => {
     const accessSecret = process.env.JWT_ACCESS_SECRET || 'corporate-agent-neon-jwt-access-secret-2024-production-ready-key-v1';
     const refreshSecret = process.env.JWT_REFRESH_SECRET || 'corporate-agent-neon-jwt-refresh-secret-2024-production-ready-key-v1';
 
-    const accessToken = jwt.sign(payload, accessSecret as string, { 
+    const accessToken = jwt.sign(payload, accessSecret, { 
       expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m' 
-    } as jwt.SignOptions);
+    });
 
-    const refreshToken = jwt.sign(payload, refreshSecret as string, { 
+    const refreshToken = jwt.sign(payload, refreshSecret, { 
       expiresIn: process.env.JWT_REFRESH_EXPIRY || '7d' 
-    } as jwt.SignOptions);
+    });
 
     // Store refresh token
     await prisma.refreshToken.create({
@@ -356,7 +356,7 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Login failed',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error.message,
     });
   }
 });
@@ -380,7 +380,7 @@ app.post('/api/auth/logout', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Logout failed',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error.message,
     });
   }
 });
@@ -394,7 +394,7 @@ app.use('*', (req, res) => {
 });
 
 // Basic error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
     success: false,
@@ -403,4 +403,13 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-export default app;
+const PORT = process.env.PORT || 3001;
+
+app.listen(PORT, () => {
+  console.log(`🚀 Corporate Agent Backend Server running on port ${PORT}`);
+  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔐 Authentication enabled with Neon database`);
+});
+
+module.exports = app;

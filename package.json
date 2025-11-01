@@ -5,6 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "start": "node dist/server-simple.js",
+    "start:simple": "node server-simple.js",
     "start:full": "node dist/server.js",
     "dev": "nodemon src/server-simple.ts",
     "dev:full": "nodemon src/server.ts",
