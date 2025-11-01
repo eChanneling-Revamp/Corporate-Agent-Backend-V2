@@ -1,0 +1,214 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      Role     @default(AGENT)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  agent     Agent?
+  
+  @@map("users")
+}
+
+model Agent {
+  id          String   @id @default(uuid())
+  name        String
+  companyName String?
+  email       String
+  phone       String?
+  address     String?
+  isActive    Boolean  @default(true)
+  userId      String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+  payments     Payment[]
+  reports      Report[]
+  integrations Integration[]
+  
+  @@map("agents")
+}
+
+model Doctor {
+  id              String   @id @default(uuid())
+  name            String
+  specialty       String
+  hospital        String
+  phone           String?
+  email           String?
+  consultationFee Float    @default(0)
+  rating          Float    @default(0)
+  photoUrl        String?
+  description     String?
+  availableDates  Json?    // Store available dates and time slots
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  appointments Appointment[]
+  
+  @@map("doctors")
+}
+
+model Appointment {
+  id           String            @id @default(uuid())
+  agentId      String
+  doctorId     String
+  patientName  String
+  patientEmail String
+  patientPhone String
+  date         DateTime
+  timeSlot     String
+  status       AppointmentStatus @default(PENDING)
+  amount       Float
+  notes        String?
+  cancelReason String?
+  paymentId    String?           @unique
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  
+  // Relations
+  agent   Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  doctor  Doctor   @relation(fields: [doctorId], references: [id])
+  payment Payment? @relation(fields: [paymentId], references: [id])
+  
+  @@map("appointments")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  amount        Float
+  status        PaymentStatus @default(PENDING)
+  method        PaymentMethod @default(CARD)
+  transactionId String?       @unique
+  agentId       String?
+  notes         String?
+  processedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  // Relations
+  agent       Agent?       @relation(fields: [agentId], references: [id])
+  appointment Appointment?
+  
+  @@map("payments")
+}
+
+model Report {
+  id         String     @id @default(uuid())
+  agentId    String
+  type       ReportType
+  title      String
+  data       Json
+  parameters Json? // Store report generation parameters
+  fileUrl    String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  @@map("reports")
+}
+
+model Integration {
+  id          String   @id @default(uuid())
+  agentId     String
+  name        String
+  provider    String   // e.g., "stripe", "paypal", "calendar"
+  apiKey      String
+  secretKey   String?
+  config      Json?    // Additional configuration
+  isActive    Boolean  @default(true)
+  lastUsedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  @@map("integrations")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  @@map("refresh_tokens")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  oldData   Json?
+  newData   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  
+  @@map("audit_logs")
+}
+
+// Enums
+enum Role {
+  ADMIN
+  AGENT
+  MANAGER
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CARD
+  BANK_TRANSFER
+  CASH
+  WALLET
+}
+
+enum ReportType {
+  APPOINTMENTS
+  REVENUE
+  DOCTOR_PERFORMANCE
+  HOSPITAL_ANALYTICS
+  AGENT_PERFORMANCE
+  CUSTOM
+}
