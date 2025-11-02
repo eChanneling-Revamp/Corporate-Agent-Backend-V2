@@ -5,7 +5,7 @@
   "main": "dist/server-simple.js",
   "scripts": {
     "start": "node dist/server-simple.js",
-    "build": "npm run prisma:generate && tsc --noEmitOnError false --skipLibCheck true",
+    "build": "npm install --only=dev && npm run prisma:generate && tsc --noEmitOnError false --skipLibCheck true",
     "start:simple": "node server-simple.js",
     "start:full": "node dist/server.js",
     "dev": "nodemon src/server-simple.ts",
