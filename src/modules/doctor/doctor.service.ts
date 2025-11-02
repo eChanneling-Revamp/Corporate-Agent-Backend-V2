@@ -141,7 +141,15 @@ export class DoctorService {
   static async createDoctor(data: CreateDoctorInput) {
     const doctor = await prisma.doctor.create({
       data: {
-        ...data,
+        name: data.name,
+        specialty: data.specialty,
+        hospital: data.hospital,
+        phone: data.phone,
+        email: data.email,
+        consultationFee: data.consultationFee,
+        rating: data.rating || 0,
+        photoUrl: data.photoUrl,
+        description: data.description,
         availableDates: data.availableDates || [],
       },
     });

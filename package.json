@@ -5,7 +5,7 @@
   "main": "dist/server-simple.js",
   "scripts": {
     "start": "node dist/server-simple.js",
-    "build": "npm run prisma:generate && tsc --noEmitOnError false --skipLibCheck true",
+    "build": "npm run prisma:generate && tsc --skipLibCheck --noEmitOnError false",
     "start:simple": "node server-simple.js",
     "start:full": "node dist/server.js",
     "dev": "nodemon src/server-simple.ts",
@@ -23,7 +23,15 @@
   },
   "dependencies": {
     "@prisma/client": "^5.6.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/compression": "^1.7.5",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^20.9.0",
     "@types/nodemailer": "^7.0.3",
+    "@types/uuid": "^9.0.7",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
@@ -36,20 +44,13 @@
     "morgan": "^1.10.0",
     "nodemailer": "^7.0.10",
     "socket.io": "^4.7.4",
+    "typescript": "^5.2.2",
     "uuid": "^9.0.1",
     "winston": "^3.11.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/compression": "^1.7.5",
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
     "@types/jest": "^29.5.8",
-    "@types/jsonwebtoken": "^9.0.5",
-    "@types/morgan": "^1.9.9",
-    "@types/node": "^20.9.0",
-    "@types/uuid": "^9.0.7",
     "@typescript-eslint/eslint-plugin": "^6.12.0",
     "@typescript-eslint/parser": "^6.12.0",
     "eslint": "^8.54.0",
@@ -58,8 +59,7 @@
     "prisma": "^5.6.0",
     "ts-node": "^10.9.1",
     "tsconfig-paths": "^4.2.0",
-    "tsx": "^4.20.6",
-    "typescript": "^5.2.2"
+    "tsx": "^4.20.6"
   },
   "engines": {
     "node": ">=18.0.0",
