@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: corporate-agent-backend
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    # Environment variables should be set in Render dashboard:
+    # - DATABASE_URL (Neon PostgreSQL connection string)
+    # - JWT_ACCESS_SECRET
+    # - JWT_REFRESH_SECRET  
+    # - SMTP_HOST
+    # - SMTP_USER
+    # - SMTP_PASS
+    # - EMAIL_FROM
