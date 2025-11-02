@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { ResponseUtils } from '../../utils/response';
+import { asyncHandler } from '../../middleware/errorHandler';
 import {
   LoginInput,
   RegisterInput,
@@ -17,8 +18,8 @@ export class AuthController {
     
     ResponseUtils.success(
       res,
-      'User registered successfully',
       result,
+      'User registered successfully',
       201
     );
   });
@@ -31,8 +32,8 @@ export class AuthController {
     
     ResponseUtils.success(
       res,
-      'Login successful',
-      result
+      result,
+      'Login successful'
     );
   });
 
@@ -44,8 +45,8 @@ export class AuthController {
     
     ResponseUtils.success(
       res,
-      'Token refreshed successfully',
-      result
+      result,
+      'Token refreshed successfully'
     );
   });
 
@@ -61,6 +62,7 @@ export class AuthController {
     
     ResponseUtils.success(
       res,
+      {},
       'Logged out successfully'
     );
   });
@@ -77,8 +79,9 @@ export class AuthController {
     
     const result = await AuthService.changePassword(userId, req.body);
     
-    ResponseUtils.success(
+    return ResponseUtils.success(
       res,
+      {},
       result.message
     );
   });
@@ -95,10 +98,10 @@ export class AuthController {
     
     const profile = await AuthService.getProfile(userId);
     
-    ResponseUtils.success(
+    return ResponseUtils.success(
       res,
-      'Profile retrieved successfully',
-      profile
+      profile,
+      'Profile retrieved successfully'
     );
   });
 
@@ -108,11 +111,11 @@ export class AuthController {
   static verifyToken = asyncHandler(async (req: Request, res: Response) => {
     ResponseUtils.success(
       res,
-      'Token is valid',
       {
         user: req.user,
         valid: true,
-      }
+      },
+      'Token is valid'
     );
   });
 
@@ -124,8 +127,8 @@ export class AuthController {
     
     ResponseUtils.success(
       res,
-      'Expired tokens cleaned successfully',
-      result
+      result,
+      'Expired tokens cleaned successfully'
     );
   });
 }

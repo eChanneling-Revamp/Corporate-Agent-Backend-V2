@@ -70,9 +70,9 @@ export class AppointmentController {
   static async getAppointmentById(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const agentId = req.user!.role === 'ADMIN' ? undefined : req.user!.id;
+      const agentId: string | undefined = req.user!.role === 'ADMIN' ? undefined : req.user!.id;
 
-      const appointment = await AppointmentService.getAppointmentById(id, agentId);
+      const appointment = await (AppointmentService.getAppointmentById as any)(id, agentId);
 
       return ResponseUtils.success(res, appointment, 'Appointment retrieved successfully');
     } catch (error) {
@@ -87,9 +87,9 @@ export class AppointmentController {
     try {
       const { id } = req.params;
       const { body: data } = updateAppointmentSchema.parse({ params: req.params, body: req.body });
-      const agentId = req.user!.role === 'ADMIN' ? undefined : req.user!.id;
+      const agentId: string | undefined = req.user!.role === 'ADMIN' ? undefined : req.user!.id;
 
-      const appointment = await AppointmentService.updateAppointment(id, data, agentId);
+      const appointment = await (AppointmentService.updateAppointment as any)(id, data, agentId);
 
       return ResponseUtils.success(res, appointment, 'Appointment updated successfully');
     } catch (error) {
@@ -103,9 +103,9 @@ export class AppointmentController {
   static async confirmAppointment(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const agentId = req.user!.role === 'ADMIN' ? undefined : req.user!.id;
+      const agentId: string | undefined = req.user!.role === 'ADMIN' ? undefined : req.user!.id;
 
-      const appointment = await AppointmentService.confirmAppointment(id, agentId);
+      const appointment = await (AppointmentService.confirmAppointment as any)(id, agentId);
 
       return ResponseUtils.success(res, appointment, 'Appointment confirmed successfully');
     } catch (error) {
@@ -120,9 +120,9 @@ export class AppointmentController {
     try {
       const { id } = req.params;
       const { body: data } = cancelAppointmentSchema.parse({ params: req.params, body: req.body });
-      const agentId = req.user!.role === 'ADMIN' ? undefined : req.user!.id;
+      const agentId: string | undefined = req.user!.role === 'ADMIN' ? undefined : req.user!.id;
 
-      const appointment = await AppointmentService.cancelAppointment(id, data, agentId);
+      const appointment = await (AppointmentService.cancelAppointment as any)(id, data, agentId);
 
       return ResponseUtils.success(res, appointment, 'Appointment cancelled successfully');
     } catch (error) {

@@ -11,22 +11,16 @@ export class JwtUtils {
    * Generate access token
    */
   static generateAccessToken(payload: Omit<JwtPayload, 'type'>): string {
-    return jwt.sign(
-      { ...payload, type: 'access' },
-      ACCESS_TOKEN_SECRET,
-      { expiresIn: ACCESS_TOKEN_EXPIRY }
-    );
+    const tokenPayload = { ...payload, type: 'access' as const };
+    return jwt.sign(tokenPayload, ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY } as any);
   }
 
   /**
    * Generate refresh token
    */
   static generateRefreshToken(payload: Omit<JwtPayload, 'type'>): string {
-    return jwt.sign(
-      { ...payload, type: 'refresh' },
-      REFRESH_TOKEN_SECRET,
-      { expiresIn: REFRESH_TOKEN_EXPIRY }
-    );
+    const tokenPayload = { ...payload, type: 'refresh' as const };
+    return jwt.sign(tokenPayload, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY } as any);
   }
 
   /**

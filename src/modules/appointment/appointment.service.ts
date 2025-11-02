@@ -67,6 +67,7 @@ export class AppointmentService {
             id: true,
             name: true,
             companyName: true,
+            email: true,
           },
         },
       },
@@ -334,7 +335,7 @@ export class AppointmentService {
   /**
    * Get appointment by ID
    */
-  static async getAppointmentById(appointmentId: string, agentId?: string) {
+  static async getAppointmentById(appointmentId: string, agentId?: string | undefined) {
     const where: any = { id: appointmentId };
     
     // If not admin, ensure appointment belongs to agent
@@ -382,7 +383,7 @@ export class AppointmentService {
   static async updateAppointment(
     appointmentId: string,
     data: UpdateAppointmentInput,
-    agentId?: string
+    agentId?: string | undefined
   ) {
     const where: any = { id: appointmentId };
     
@@ -455,7 +456,7 @@ export class AppointmentService {
   /**
    * Confirm appointment
    */
-  static async confirmAppointment(appointmentId: string, agentId?: string) {
+  static async confirmAppointment(appointmentId: string, agentId?: string | undefined) {
     const result = await this.updateAppointment(
       appointmentId,
       { status: 'CONFIRMED' },
@@ -471,7 +472,7 @@ export class AppointmentService {
   static async cancelAppointment(
     appointmentId: string,
     data: CancelAppointmentInput,
-    agentId?: string
+    agentId?: string | undefined
   ) {
     const where: any = { id: appointmentId };
     

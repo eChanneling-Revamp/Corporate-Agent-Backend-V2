@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { logger } from '@/utils/logger';
 
 // Create a singleton instance of Prisma Client
@@ -33,7 +33,7 @@ const prisma =
 
 // Log Prisma queries in development
 if (process.env.NODE_ENV === 'development') {
-  prisma.$on('query', (e) => {
+  (prisma as any).$on('query', (e: Prisma.QueryEvent) => {
     logger.debug('Query: ' + e.query);
     logger.debug('Params: ' + e.params);
     logger.debug('Duration: ' + e.duration + 'ms');
@@ -41,7 +41,7 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Log Prisma errors
-prisma.$on('error', (e) => {
+(prisma as any).$on('error', (e: Prisma.LogEvent) => {
   logger.error('Prisma Error:', e);
 });
 

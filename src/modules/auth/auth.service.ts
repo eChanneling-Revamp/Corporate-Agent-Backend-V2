@@ -277,14 +277,6 @@ export class AuthService {
       include: {
         agent: true,
       },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-        agent: true,
-      },
     });
 
     if (!user) {

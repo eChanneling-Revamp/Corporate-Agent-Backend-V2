@@ -40,8 +40,8 @@ export class DoctorController {
 
       ResponseUtils.success(
         res,
-        'Doctor retrieved successfully',
-        doctor
+        doctor,
+        'Doctor retrieved successfully'
       );
     }
   );
@@ -55,8 +55,8 @@ export class DoctorController {
 
       ResponseUtils.success(
         res,
-        'Doctor created successfully',
         doctor,
+        'Doctor created successfully',
         201
       );
     }
@@ -73,8 +73,8 @@ export class DoctorController {
 
       ResponseUtils.success(
         res,
-        'Doctor updated successfully',
-        updatedDoctor
+        updatedDoctor,
+        'Doctor updated successfully'
       );
     }
   );
@@ -90,6 +90,7 @@ export class DoctorController {
 
       ResponseUtils.success(
         res,
+        {},
         result.message
       );
     }
@@ -106,8 +107,8 @@ export class DoctorController {
 
       ResponseUtils.success(
         res,
-        'Available slots retrieved successfully',
-        slots
+        slots,
+        'Available slots retrieved successfully'
       );
     }
   );
@@ -120,8 +121,8 @@ export class DoctorController {
 
     ResponseUtils.success(
       res,
-      'Specialties retrieved successfully',
-      specialties
+      specialties,
+      'Specialties retrieved successfully'
     );
   });
 
@@ -133,8 +134,8 @@ export class DoctorController {
 
     ResponseUtils.success(
       res,
-      'Hospitals retrieved successfully',
-      hospitals
+      hospitals,
+      'Hospitals retrieved successfully'
     );
   });
 
@@ -150,8 +151,8 @@ export class DoctorController {
 
       ResponseUtils.success(
         res,
-        'Doctor availability updated successfully',
-        updatedDoctor
+        updatedDoctor,
+        'Doctor availability updated successfully'
       );
     }
   );

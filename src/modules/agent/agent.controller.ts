@@ -21,8 +21,8 @@ export class AgentController {
 
     ResponseUtils.success(
       res,
-      'Agent retrieved successfully',
-      agent
+      agent,
+      'Agent retrieved successfully'
     );
   });
 
@@ -38,10 +38,10 @@ export class AgentController {
 
     const agent = await AgentService.getAgentByUserId(userId);
 
-    ResponseUtils.success(
+    return ResponseUtils.success(
       res,
-      'Agent profile retrieved successfully',
-      agent
+      agent,
+      'Agent profile retrieved successfully'
     );
   });
 
@@ -57,8 +57,8 @@ export class AgentController {
 
       ResponseUtils.success(
         res,
-        'Agent profile updated successfully',
-        updatedAgent
+        updatedAgent,
+        'Agent profile updated successfully'
       );
     }
   );
@@ -79,10 +79,10 @@ export class AgentController {
       
       const updatedAgent = await AgentService.updateAgent(existingAgent.id, req.body, userId);
 
-      ResponseUtils.success(
+      return ResponseUtils.success(
         res,
-        'Profile updated successfully',
-        updatedAgent
+        updatedAgent,
+        'Profile updated successfully'
       );
     }
   );
@@ -118,10 +118,10 @@ export class AgentController {
     
     const dashboard = await AgentService.getAgentDashboard(agent.id);
 
-    ResponseUtils.success(
+    return ResponseUtils.success(
       res,
-      'Dashboard data retrieved successfully',
-      dashboard
+      dashboard,
+      'Dashboard data retrieved successfully'
     );
   });
 
@@ -136,8 +136,8 @@ export class AgentController {
 
       ResponseUtils.success(
         res,
-        'Agent dashboard retrieved successfully',
-        dashboard
+        dashboard,
+        'Agent dashboard retrieved successfully'
       );
     }
   );
@@ -153,6 +153,7 @@ export class AgentController {
 
       ResponseUtils.success(
         res,
+        {},
         result.message
       );
     }
@@ -169,6 +170,7 @@ export class AgentController {
 
       ResponseUtils.success(
         res,
+        {},
         result.message
       );
     }

@@ -165,6 +165,182 @@ app.get('/api/appointments', async (req, res) => {
   }
 });
 
+// Create appointment endpoint
+app.post('/api/appointments', async (req, res) => {
+  try {
+    console.log('📅 Creating new appointment:', req.body);
+    
+    const {
+      doctorId,
+      patientName,
+      patientEmail,
+      patientPhone,
+      date,
+      timeSlot,
+      notes
+    } = req.body;
+
+    // Validate required fields
+    if (!doctorId || !patientName || !patientEmail || !patientPhone || !date || !timeSlot) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields'
+      });
+    }
+
+    // Get doctor info for fee calculation
+    const doctor = await prisma.doctor.findUnique({
+      where: { id: doctorId }
+    });
+
+    if (!doctor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Doctor not found'
+      });
+    }
+
+    // Check if time slot is available
+    const existingAppointment = await prisma.appointment.findFirst({
+      where: {
+        doctorId,
+        date: new Date(date),
+        timeSlot,
+        status: { in: ['PENDING', 'CONFIRMED'] }
+      }
+    });
+
+    if (existingAppointment) {
+      return res.status(409).json({
+        success: false,
+        message: 'Time slot is not available'
+      });
+    }
+
+    // For now, we'll use a default agent ID (first agent in the system)
+    // In a real app, this would come from the authenticated user
+    const defaultAgent = await prisma.agent.findFirst({
+      where: { isActive: true }
+    });
+
+    if (!defaultAgent) {
+      return res.status(400).json({
+        success: false,
+        message: 'No active agent found'
+      });
+    }
+
+    // Create the appointment
+    const appointment = await prisma.appointment.create({
+      data: {
+        agentId: defaultAgent.id,
+        doctorId,
+        patientName,
+        patientEmail,
+        patientPhone,
+        date: new Date(date),
+        timeSlot,
+        amount: doctor.consultationFee,
+        notes: notes || '',
+        status: 'PENDING'
+      },
+      include: {
+        doctor: true,
+        agent: true
+      }
+    });
+
+    console.log('✅ Appointment created successfully:', appointment.id);
+
+    // Send email notification
+    try {
+      console.log('📧 Sending confirmation email to:', patientEmail);
+      
+      // Import nodemailer dynamically to avoid startup issues if not configured
+      const nodemailer = require('nodemailer');
+      
+      // Create transporter
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: process.env.SMTP_PORT || 587,
+        secure: false, // true for 465, false for other ports
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+
+      // Email content
+      const mailOptions = {
+        from: process.env.EMAIL_FROM || 'echanneling.revamp@gmail.com',
+        to: patientEmail,
+        subject: 'Appointment Confirmation - eChannelling Corporate Agent',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #2563eb;">Appointment Confirmation</h2>
+            <p>Dear ${patientName},</p>
+            <p>Your appointment has been successfully booked. Here are the details:</p>
+            <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <p><strong>Doctor:</strong> ${doctor.name}</p>
+              <p><strong>Specialty:</strong> ${doctor.specialty}</p>
+              <p><strong>Hospital:</strong> ${doctor.hospital}</p>
+              <p><strong>Date:</strong> ${new Date(date).toLocaleDateString()}</p>
+              <p><strong>Time:</strong> ${timeSlot}</p>
+              <p><strong>Consultation Fee:</strong> LKR ${doctor.consultationFee}</p>
+              <p><strong>Appointment ID:</strong> ${appointment.id}</p>
+            </div>
+            <p><strong>Important:</strong> Please arrive 15 minutes before your scheduled time.</p>
+            <p>If you need to cancel or reschedule, please contact us at least 24 hours in advance.</p>
+            <p>Thank you for choosing our services!</p>
+            <hr>
+            <p style="font-size: 12px; color: #6b7280;">
+              This is an automated message from eChannelling Corporate Agent System.<br>
+              For support, contact: ${process.env.EMAIL_FROM}
+            </p>
+          </div>
+        `
+      };
+
+      // Send email
+      if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+        await transporter.sendMail(mailOptions);
+        console.log('📧 Email notification sent successfully to:', patientEmail);
+      } else {
+        console.log('📧 Email service not configured, skipping email notification');
+      }
+      
+    } catch (emailError) {
+      console.error('📧 Failed to send email:', emailError);
+      // Don't fail the appointment creation if email fails
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'Appointment created successfully',
+      data: {
+        id: appointment.id,
+        appointmentId: appointment.id,
+        doctorName: doctor.name,
+        specialty: doctor.specialty,
+        hospital: doctor.hospital,
+        patientName: appointment.patientName,
+        date: appointment.date.toISOString().split('T')[0],
+        time: appointment.timeSlot,
+        amount: appointment.amount,
+        status: appointment.status.toLowerCase()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Appointment creation error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to create appointment',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Dashboard stats endpoint - serving real Neon PostgreSQL data
 app.get('/api/dashboard', async (req, res) => {
   try {
