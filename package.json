@@ -1,7 +1,7 @@
 {
   "name": "corporate-agent-backend",
   "version": "1.0.0",
-  "description": "Corporate Agent Module Backend for eChannelling Revamp System",
+  "description": "Corporate Agent Module Backend for eChannelling Revamp System - Fixed for Render",
   "main": "dist/server-simple.js",
   "scripts": {
     "start": "node dist/server-simple.js",
