@@ -20,7 +20,12 @@ app.use(helmet());
 
 // CORS configuration
 const corsOptions = {
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || [
+    'http://localhost:3000',
+    'https://corporate-agent-frontend-v2.vercel.app',
+    'https://corporate-agent-frontend-v2-git-main-echanneling-revamp.vercel.app',
+    'https://corporate-agent-frontend-v2-git-feat-prod-echanneling-revamp.vercel.app'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
