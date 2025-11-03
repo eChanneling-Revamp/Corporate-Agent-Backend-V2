@@ -79,7 +79,7 @@ app.get('/api/test', (req, res) => {
 // Email service test endpoint
 app.get('/api/test/email', async (req, res) => {
   try {
-    console.log('🧪 Testing email configuration...');
+    console.log('[EMAIL] Testing email configuration...');
     const testResult = await emailService.testConnection();
     
     res.json({
@@ -127,7 +127,7 @@ app.post('/api/test/send-email', async (req, res) => {
       }
     };
 
-    console.log('📧 Sending test email to:', to);
+    console.log('[EMAIL] Sending test email to:', to);
     const emailResult = await emailService.sendAppointmentConfirmation(testAppointmentData);
 
     res.json({
@@ -335,7 +335,7 @@ app.get('/api/payments', async (req, res) => {
 // Authentication endpoints
 app.post('/api/auth/login', async (req, res) => {
   try {
-    console.log('🔐 Login attempt for:', req.body.email);
+    console.log('[AUTH] Login attempt for:', req.body.email);
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -403,7 +403,7 @@ app.post('/api/auth/login', async (req, res) => {
       },
     });
 
-    console.log('✅ Login successful for:', user.email);
+    console.log('[SUCCESS] Login successful for:', user.email);
 
     return res.json({
       success: true,
@@ -427,7 +427,7 @@ app.post('/api/auth/login', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Login error:', error);
+    console.error('[ERROR] Login error:', error);
     return res.status(500).json({
       success: false,
       message: 'Login failed',
@@ -552,19 +552,19 @@ app.post('/api/appointments', async (req, res) => {
       };
 
       // Send patient confirmation email
-      console.log('📧 Sending appointment confirmation email...');
+      console.log('[EMAIL] Sending appointment confirmation email...');
       const patientEmailResult = await emailService.sendAppointmentConfirmation(appointmentData);
       
       // Send corporate notification email
-      console.log('📧 Sending corporate notification email...');
+      console.log('[EMAIL] Sending corporate notification email...');
       const corporateEmailResult = await emailService.sendCorporateNotification(appointmentData);
 
-      console.log('✅ Email notifications processed:', { 
+      console.log('[SUCCESS] Email notifications processed:', { 
         patient: patientEmailResult.success, 
         corporate: corporateEmailResult.success 
       });
     } catch (emailError) {
-      console.error('⚠️ Email sending failed but appointment created:', emailError);
+      console.error('[WARNING] Email sending failed but appointment created:', emailError);
       // Don't fail the appointment creation if email fails
     }
 
@@ -634,18 +634,18 @@ app.post('/api/appointments/bulk', async (req, res) => {
             }
           };
 
-          console.log(`📧 Sending confirmation email for appointment ${appointment.id}...`);
+          console.log(`[EMAIL] Sending confirmation email for appointment ${appointment.id}...`);
           const emailResult = await emailService.sendAppointmentConfirmation(appointmentData);
           if (emailResult.success) {
             emailsSent++;
           }
         } catch (emailError) {
-          console.error(`⚠️ Email failed for appointment ${appointment.id}:`, emailError);
+          console.error(`[WARNING] Email failed for appointment ${appointment.id}:`, emailError);
         }
       }
     }
 
-    console.log(`✅ Bulk creation complete: ${createdAppointments.length} appointments, ${emailsSent} emails sent`);
+    console.log(`[SUCCESS] Bulk creation complete: ${createdAppointments.length} appointments, ${emailsSent} emails sent`);
 
     res.json({
       success: true,
@@ -782,10 +782,10 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
-  console.log(`🚀 Corporate Agent Backend Server running on port ${PORT}`);
-  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔐 Authentication enabled with Neon database`);
+  console.log(`[SERVER] Corporate Agent Backend Server running on port ${PORT}`);
+  console.log(`[ENV] Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`[HEALTH] Health check: http://localhost:${PORT}/health`);
+  console.log(`[AUTH] Authentication enabled with Neon database`);
 });
 
 module.exports = app;

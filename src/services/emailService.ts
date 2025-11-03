@@ -62,16 +62,16 @@ class EmailService {
       const mailOptions = {
         from: `"eChannelling Corporate Agent" <${process.env.SMTP_USER}>`,
         to: patientEmail,
-        subject: `✅ Appointment Confirmed - ${doctorName}`,
+        subject: `[CONFIRMED] Appointment Confirmed - ${doctorName}`,
         html: this.generateAppointmentConfirmationHTML(appointmentData),
         text: this.generateAppointmentConfirmationText(appointmentData)
       };
 
       const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Appointment confirmation email sent:', info.messageId);
+      console.log('[SUCCESS] Appointment confirmation email sent:', info.messageId);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      console.error('❌ Email sending failed:', error);
+      console.error('[ERROR] Email sending failed:', error);
       return { success: false, error: (error as Error).message };
     }
   }
@@ -84,16 +84,16 @@ class EmailService {
       const mailOptions = {
         from: `"eChannelling System" <${process.env.SMTP_USER}>`,
         to: corporateAgent.email,
-        subject: `📋 New Appointment Booked - ${patientName}`,
+        subject: `[BOOKING] New Appointment Booked - ${patientName}`,
         html: this.generateCorporateNotificationHTML(appointmentData),
         text: `New appointment booked for ${patientName} with ${doctorName} on ${date} at ${time}`
       };
 
       const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Corporate notification sent:', info.messageId);
+      console.log('[SUCCESS] Corporate notification sent:', info.messageId);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      console.error('❌ Corporate notification failed:', error);
+      console.error('[ERROR] Corporate notification failed:', error);
       return { success: false, error: (error as Error).message };
     }
   }
@@ -145,7 +145,7 @@ class EmailService {
                 <p>Great news! Your appointment has been confirmed. Here are your appointment details:</p>
                 
                 <div class="appointment-card">
-                    <h3 style="margin-top: 0; color: #0891b2;">📋 Appointment Details</h3>
+                    <h3 style="margin-top: 0; color: #0891b2;">[DETAILS] Appointment Details</h3>
                     
                     <div class="info-row">
                         <span class="label">👨‍⚕️ Doctor:</span>
@@ -158,7 +158,7 @@ class EmailService {
                     </div>
                     
                     <div class="info-row">
-                        <span class="label">🏢 Hospital:</span>
+                        <span class="label">[HOSPITAL] Hospital:</span>
                         <span class="value">${hospital}</span>
                     </div>
                     
@@ -178,18 +178,18 @@ class EmailService {
                     </div>
                     
                     <div class="info-row">
-                        <span class="label">💰 Consultation Fee:</span>
+                        <span class="label">[FEE] Consultation Fee:</span>
                         <span class="value"><strong>Rs. ${amount.toLocaleString()}</strong></span>
                     </div>
                     
                     <div class="info-row" style="border-bottom: none;">
-                        <span class="label">💳 Payment:</span>
+                        <span class="label">[PAYMENT] Payment:</span>
                         <span class="highlight">Covered by ${corporateAgent.companyName}</span>
                     </div>
                 </div>
                 
                 <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 15px; margin: 20px 0;">
-                    <h4 style="margin-top: 0; color: #92400e;">📋 Important Instructions:</h4>
+                    <h4 style="margin-top: 0; color: #92400e;">[INSTRUCTIONS] Important Instructions:</h4>
                     <ul style="margin: 0; color: #92400e;">
                         <li>Please arrive <strong>15 minutes early</strong> for registration</li>
                         <li>Bring a valid ID and this appointment confirmation</li>
@@ -236,12 +236,12 @@ Your appointment has been successfully booked!
 APPOINTMENT DETAILS:
 👨‍⚕️ Doctor: ${doctorName}
 🏥 Specialty: ${specialty}
-🏢 Hospital: ${hospital}
+[HOSPITAL] Hospital: ${hospital}
 📅 Date: ${date}
 🕐 Time: ${time}
 🆔 Appointment ID: ${appointmentId}
-💰 Consultation Fee: Rs. ${amount.toLocaleString()}
-💳 Payment: Covered by ${corporateAgent.companyName}
+[FEE] Consultation Fee: Rs. ${amount.toLocaleString()}
+[PAYMENT] Payment: Covered by ${corporateAgent.companyName}
 
 IMPORTANT INSTRUCTIONS:
 • Please arrive 15 minutes early for registration
@@ -285,7 +285,7 @@ Powered by ${corporateAgent.companyName}
     </head>
     <body>
         <div class="header">
-            <h2>📋 New Appointment Booked</h2>
+            <h2>[BOOKING] New Appointment Booked</h2>
         </div>
         <div class="content">
             <p>A new appointment has been booked through your corporate agent portal.</p>
@@ -301,8 +301,8 @@ Powered by ${corporateAgent.companyName}
                 <p><strong>Amount:</strong> Rs. ${amount.toLocaleString()}</p>
             </div>
             
-            <p>✅ Patient notification sent successfully</p>
-            <p>💳 Corporate billing processed</p>
+            <p>[SUCCESS] Patient notification sent successfully</p>
+            <p>[BILLING] Corporate billing processed</p>
         </div>
     </body>
     </html>`;
@@ -312,10 +312,10 @@ Powered by ${corporateAgent.companyName}
   async testConnection(): Promise<EmailResult> {
     try {
       await this.transporter.verify();
-      console.log('✅ SMTP server is ready to take our messages');
+      console.log('[SUCCESS] SMTP server is ready to take our messages');
       return { success: true };
     } catch (error) {
-      console.error('❌ SMTP connection failed:', error);
+      console.error('[ERROR] SMTP connection failed:', error);
       return { success: false, error: (error as Error).message };
     }
   }

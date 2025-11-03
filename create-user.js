@@ -24,7 +24,7 @@ async function createUser() {
       },
     });
 
-    console.log('👤 User created/updated:', user.email);
+    console.log('[USER] User created/updated:', user.email);
 
     // Create agent profile
     const agent = await prisma.agent.upsert({
@@ -44,13 +44,13 @@ async function createUser() {
       },
     });
 
-    console.log('🏢 Agent profile created/updated:', agent.companyName);
-    console.log('✅ User setup completed successfully!');
-    console.log('📧 Email: corporateagent@slt.lk');
-    console.log('🔑 Password: ABcd123#');
+    console.log('[PROFILE] Agent profile created/updated:', agent.companyName);
+    console.log('[SUCCESS] User setup completed successfully!');
+    console.log('[EMAIL] Email: corporateagent@slt.lk');
+    console.log('[PASSWORD] Password: ABcd123#');
 
   } catch (error) {
-    console.error('❌ Error creating user:', error);
+    console.error('[ERROR] Error creating user:', error);
   } finally {
     await prisma.$disconnect();
   }
