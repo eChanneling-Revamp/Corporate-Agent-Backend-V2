@@ -298,10 +298,10 @@ Powered by ${corporateAgent.companyName}
   async testConnection() {
     try {
       await this.transporter.verify();
-      console.log('✅ SMTP server is ready to take our messages');
+      console.log('[SUCCESS] SMTP server is ready to take our messages');
       return { success: true, message: 'SMTP connection verified' };
     } catch (error) {
-      console.error('❌ SMTP connection failed:', error);
+      console.error('[ERROR] SMTP connection failed:', error);
       return { success: false, error: error.message };
     }
   }

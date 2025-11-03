@@ -3,8 +3,8 @@ services:
     name: corporate-agent-backend
     runtime: node
     plan: free
-    buildCommand: npm ci --include=dev && npm run build
-    startCommand: npm start
+    buildCommand: npm ci --include=dev
+    startCommand: node server-simple.js
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV

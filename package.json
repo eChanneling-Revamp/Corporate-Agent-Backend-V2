@@ -2,9 +2,9 @@
   "name": "corporate-agent-backend",
   "version": "1.0.0",
   "description": "Corporate Agent Module Backend for eChannelling Revamp System - Fixed for Render",
-  "main": "dist/server-simple.js",
+  "main": "server-simple.js",
   "scripts": {
-    "start": "node dist/server-simple.js",
+    "start": "node server-simple.js",
     "build": "npm run prisma:generate && tsc --skipLibCheck --noEmitOnError false",
     "start:simple": "node server-simple.js",
     "start:full": "node dist/server.js",
