@@ -1,19 +1,75 @@
-# Corporate Agent Backend Module
+# Corporate Agent Module - Backend API
 
-A comprehensive Node.js backend for the eChannelling Corporate Agent system, built with Express.js, TypeScript, Prisma, and PostgreSQL.
+A comprehensive Node.js/Express backend API for the eChanneling Corporate Agent system, providing robust healthcare appointment management services with PostgreSQL database integration.
+
+![Node.js](https://img.shields.io/badge/node.js-18+-green.svg)
+![Express](https://img.shields.io/badge/express-4.18+-black.svg)
+![TypeScript](https://img.shields.io/badge/typescript-5.0+-blue.svg)
+![PostgreSQL](https://img.shields.io/badge/postgresql-15+-blue.svg)
+![Prisma](https://img.shields.io/badge/prisma-5.0+-blue.svg)
+
+## Overview
+
+The backend is a production-ready RESTful API built with Node.js, Express.js, and TypeScript. It provides comprehensive healthcare appointment management services including authentication, doctor management, appointment booking, payment processing, and analytics for corporate insurance agents.
+
+**Key Characteristics:**
+- **RESTful API Design** - Clean, predictable endpoints following REST principles
+- **Type-Safe Architecture** - Full TypeScript implementation for reliability
+- **Modular Structure** - Organized by feature modules for maintainability
+- **Enterprise Security** - JWT authentication, input validation, and security middleware
+- **Database Integration** - PostgreSQL with Prisma ORM for robust data management
 
 ## Features
 
-- **Authentication & Authorization**: JWT-based authentication with refresh tokens
-- **Agent Management**: Complete CRUD operations for corporate agents
-- **Doctor Management**: Search, filtering, and availability management
-- **Appointment System**: Single and bulk appointment booking with real-time updates
-- **Payment Processing**: Transaction management and payment tracking
-- **Reporting & Analytics**: Comprehensive reporting system
-- **Real-time Communication**: WebSocket integration for live updates
-- **Security**: Helmet, CORS, rate limiting, and input validation
-- **Logging**: Winston-based structured logging
-- **Database**: Prisma ORM with PostgreSQL
+### **Authentication & Authorization**
+- JWT-based authentication with refresh tokens
+- Role-based access control (ADMIN, AGENT, MANAGER)
+- Secure password hashing with bcrypt
+- Token refresh mechanism
+- Session management and cleanup
+
+### **Agent Management**
+- Complete CRUD operations for corporate agents
+- Company profile management
+- Dashboard statistics and analytics
+- Agent activation/deactivation (admin only)
+- Performance tracking
+
+### **Doctor Management**
+- Advanced doctor search with filtering
+- Doctor profile management (CRUD)
+- Specialty and hospital categorization
+- Availability slot management
+- Rating and review system
+
+### **Appointment System**
+- Single appointment creation and management
+- Bulk appointment processing
+- ACB (Appointment Confirmation Booking) workflow
+- Status management (PENDING, CONFIRMED, CANCELLED, COMPLETED)
+- Real-time appointment tracking
+
+### **Payment Processing**
+- Payment transaction recording
+- Multiple payment methods support
+- Payment status tracking
+- Invoice generation
+- *Note: Payment gateway integration needed*
+
+### **Reporting & Analytics**️
+- Dashboard statistics aggregation
+- Appointment analytics
+- Revenue reporting
+- Performance metrics
+- *Note: Report generation service needed*
+
+### **Security Features**
+- Helmet.js for security headers
+- CORS configuration
+- Rate limiting
+- Input validation with Zod
+- SQL injection prevention
+- Password security policies
 
 ## Tech Stack
 
@@ -317,27 +373,3 @@ Winston-based logging with:
 4. Add tests for new features
 5. Run the test suite
 6. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For support and questions:
-
-- Create an issue in the repository
-- Contact the development team
-- Check the documentation
-
-## Changelog
-
-### v1.0.0 (Initial Release)
-- Authentication system with JWT
-- Agent management module
-- Doctor search and management
-- Appointment booking system
-- Payment processing
-- Reporting functionality
-- Real-time WebSocket integration
-- Comprehensive security measures
