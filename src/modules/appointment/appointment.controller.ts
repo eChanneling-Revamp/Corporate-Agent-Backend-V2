@@ -31,7 +31,8 @@ export class AppointmentController {
    */
   static async bulkCreateAppointments(req: Request, res: Response) {
     try {
-      const { body: data } = bulkCreateAppointmentsSchema.parse({ body: req.body });
+      // Data is already validated by middleware
+      const data = req.body;
       const agentId = req.user!.id;
 
       const results = await AppointmentService.bulkCreateAppointments(agentId, data);

@@ -34,45 +34,45 @@ export const createAppointmentSchema = z.object({
   }),
 });
 
-// Bulk create appointments validation schema
+// Bulk create appointments validation schema (for validation middleware)
 export const bulkCreateAppointmentsSchema = z.object({
-  body: z.object({
-    appointments: z
-      .array(
-        z.object({
-          doctorId: z.string().uuid('Invalid doctor ID format'),
-          patientName: z
-            .string()
-            .min(2, 'Patient name must be at least 2 characters')
-            .max(100, 'Patient name is too long'),
-          patientEmail: z
-            .string()
-            .email('Invalid email format'),
-          patientPhone: z
-            .string()
-            .regex(/^[+]?[1-9]\d{1,14}$/, 'Invalid phone number format'),
-          date: z
-            .string()
-            .refine((date) => {
-              const appointmentDate = new Date(date);
-              return appointmentDate >= new Date();
-            }, 'Appointment date must be in the future'),
-          timeSlot: z
-            .string()
-            .min(1, 'Time slot is required'),
-          amount: z
-            .number()
-            .min(0, 'Amount cannot be negative')
-            .max(1000000, 'Amount is too high'),
-          notes: z
-            .string()
-            .max(500, 'Notes are too long')
-            .optional(),
-        })
-      )
-      .min(1, 'At least one appointment is required')
-      .max(100, 'Cannot create more than 100 appointments at once'),
-  }),
+  appointments: z
+    .array(
+      z.object({
+        doctorId: z.string().uuid('Invalid doctor ID format'),
+        patientName: z
+          .string()
+          .min(2, 'Patient name must be at least 2 characters')
+          .max(100, 'Patient name is too long'),
+        patientEmail: z
+          .string()
+          .email('Invalid email format'),
+        patientPhone: z
+          .string()
+          .regex(/^[+]?[1-9]\d{1,14}$/, 'Invalid phone number format'),
+        date: z
+          .string()
+          .refine((date) => {
+            const appointmentDate = new Date(date);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return appointmentDate >= today;
+          }, 'Appointment date must be today or in the future'),
+        timeSlot: z
+          .string()
+          .min(1, 'Time slot is required'),
+        amount: z
+          .number()
+          .min(0, 'Amount cannot be negative')
+          .max(1000000, 'Amount is too high'),
+        notes: z
+          .string()
+          .max(500, 'Notes are too long')
+          .optional(),
+      })
+    )
+    .min(1, 'At least one appointment is required')
+    .max(100, 'Cannot create more than 100 appointments at once'),
 });
 
 // List appointments validation schema
@@ -165,7 +165,7 @@ export const cancelAppointmentSchema = z.object({
 });
 
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>['body'];
-export type BulkCreateAppointmentsInput = z.infer<typeof bulkCreateAppointmentsSchema>['body'];
+export type BulkCreateAppointmentsInput = z.infer<typeof bulkCreateAppointmentsSchema>;
 export type ListAppointmentsQuery = z.infer<typeof listAppointmentsSchema>['query'];
 export type GetAppointmentParams = z.infer<typeof getAppointmentSchema>['params'];
 export type UpdateAppointmentInput = z.infer<typeof updateAppointmentSchema>['body'];
