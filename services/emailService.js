@@ -70,6 +70,12 @@ class EmailService {
     }
   }
 
+  // Send appointment confirmation email (alias for ACB confirmation)
+  async sendAppointmentConfirmation(appointmentData) {
+    // This is an alias for sendACBConfirmation to maintain compatibility
+    return await this.sendACBConfirmation(appointmentData);
+  }
+
   // Send ACB confirmation email (when corporate agent confirms the appointment)
   async sendACBConfirmation(appointmentData) {
     try {
