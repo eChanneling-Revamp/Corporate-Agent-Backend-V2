@@ -11,11 +11,26 @@ services:
         value: production
       - key: PORT
         value: 10000
-    # Environment variables should be set in Render dashboard:
-    # - DATABASE_URL (Neon PostgreSQL connection string)
-    # - JWT_ACCESS_SECRET
-    # - JWT_REFRESH_SECRET  
-    # - SMTP_HOST
-    # - SMTP_USER
-    # - SMTP_PASS
-    # - EMAIL_FROM
+      - key: BCRYPT_SALT_ROUNDS
+        value: 12
+    # CRITICAL: Set these in Render Dashboard -> Environment Tab:
+    # 
+    # Database:
+    # - DATABASE_URL: postgresql://neondb_owner:npg_Oc3jv9SIHGnf@ep-blue-pine-a84ccjv8-pooler.eastus2.azure.neon.tech/neondb?sslmode=require&channel_binding=require
+    # 
+    # JWT Secrets:
+    # - JWT_ACCESS_SECRET: corporate-agent-neon-jwt-access-secret-2024-production-ready-key-v1
+    # - JWT_REFRESH_SECRET: corporate-agent-neon-jwt-refresh-secret-2024-production-ready-key-v1
+    # - JWT_ACCESS_EXPIRY: 15m
+    # - JWT_REFRESH_EXPIRY: 7d
+    #
+    # Email Configuration (REQUIRED FOR EMAIL NOTIFICATIONS):
+    # - SMTP_HOST: smtp.gmail.com
+    # - SMTP_PORT: 587
+    # - SMTP_USER: echanneling.revamp@gmail.com
+    # - SMTP_PASS: dkcs xlxl esjq ayuy
+    # - EMAIL_FROM: echanneling.revamp@gmail.com
+    #
+    # CORS Configuration:
+    # - FRONTEND_URL: https://corporate-agent-frontend-v2.vercel.app
+    # - ALLOWED_ORIGINS: https://corporate-agent-frontend-v2.vercel.app,https://corporate-agent-frontend-v2-git-main-echanneling-revamp.vercel.app
