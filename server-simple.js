@@ -22,6 +22,8 @@ app.use(helmet());
 const corsOptions = {
   origin: process.env.ALLOWED_ORIGINS?.split(',') || [
     'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
     'https://corporate-agent-frontend-v2.vercel.app',
     'https://corporate-agent-frontend-v2-git-main-echanneling-revamp.vercel.app',
     'https://corporate-agent-frontend-v2-git-feat-prod-echanneling-revamp.vercel.app'
@@ -465,9 +467,18 @@ app.get('/api/appointments/unpaid', async (req, res) => {
   try {
     const appointments = await prisma.appointment.findMany({
       where: {
-        OR: [
-          { payment: null },
-          { payment: { status: 'PENDING' } }
+        AND: [
+          {
+            OR: [
+              { payment: null },
+              { payment: { status: 'PENDING' } }
+            ]
+          },
+          {
+            status: {
+              not: 'CANCELLED'
+            }
+          }
         ]
       },
       include: {
@@ -666,21 +677,80 @@ app.post('/api/appointments/bulk', async (req, res) => {
   }
 });
 
-app.put('/api/appointments/confirm/:id', async (req, res) => {
+// Appointment confirmation endpoint with email notifications
+app.post('/api/appointments/:id/confirm', async (req, res) => {
   try {
     const { id } = req.params;
     
+    // Get appointment with full details for email
+    const existingAppointment = await prisma.appointment.findUnique({
+      where: { id },
+      include: {
+        doctor: true,
+        agent: true
+      }
+    });
+
+    if (!existingAppointment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found'
+      });
+    }
+
+    // Update appointment status
     const appointment = await prisma.appointment.update({
       where: { id },
       data: { status: 'CONFIRMED' },
-      include: { doctor: true }
+      include: { 
+        doctor: true,
+        agent: true 
+      }
     });
+
+    // Send email notifications
+    try {
+      const appointmentData = {
+        patientName: appointment.patientName,
+        patientEmail: appointment.patientEmail,
+        patientPhone: appointment.patientPhone,
+        doctorName: appointment.doctor.name,
+        specialty: appointment.doctor.specialty,
+        hospital: appointment.doctor.hospital,
+        date: appointment.date.toDateString(),
+        time: appointment.timeSlot,
+        appointmentId: appointment.id,
+        amount: appointment.amount,
+        corporateAgent: {
+          companyName: appointment.agent?.companyName || 'ABC Insurance Company',
+          email: appointment.agent?.email || 'corporateagent@slt.lk'
+        }
+      };
+
+      console.log('📧 Sending ACB confirmation emails...');
+      
+      // Send patient confirmation email
+      const patientEmailResult = await emailService.sendAppointmentConfirmation(appointmentData);
+      
+      // Send corporate notification email
+      const corporateEmailResult = await emailService.sendCorporateNotification(appointmentData);
+
+      console.log('[SUCCESS] ACB confirmation emails sent:', { 
+        patient: patientEmailResult.success, 
+        corporate: corporateEmailResult.success 
+      });
+
+    } catch (emailError) {
+      console.error('[ERROR] ACB confirmation email failed:', emailError);
+      // Don't fail the operation if email fails
+    }
 
     res.json({
       success: true,
-      message: 'Appointment confirmed successfully',
+      message: 'Appointment confirmed successfully and email notifications sent',
       data: appointment
     });
+    
   } catch (error) {
     console.error('Appointment confirmation error:', error);
     res.status(500).json({
@@ -691,24 +761,92 @@ app.put('/api/appointments/confirm/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/appointments/:id', async (req, res) => {
+// Appointment cancellation endpoint with email notifications
+app.post('/api/appointments/:id/cancel', async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
+
+    if (!reason || reason.trim().length < 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cancellation reason is required and must be at least 5 characters'
+      });
+    }
+
+    // Get appointment with full details for email
+    const existingAppointment = await prisma.appointment.findUnique({
+      where: { id },
+      include: {
+        doctor: true,
+        agent: true
+      }
+    });
+
+    if (!existingAppointment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found'
+      });
+    }
     
+    // Update appointment status
     const appointment = await prisma.appointment.update({
       where: { id },
       data: { 
         status: 'CANCELLED',
-        cancelReason: reason
+        cancelReason: reason.trim()
+      },
+      include: {
+        doctor: true,
+        agent: true
       }
     });
 
+    // Send email notifications
+    try {
+      const appointmentData = {
+        patientName: appointment.patientName,
+        patientEmail: appointment.patientEmail,
+        patientPhone: appointment.patientPhone,
+        doctorName: appointment.doctor.name,
+        specialty: appointment.doctor.specialty,
+        hospital: appointment.doctor.hospital,
+        date: appointment.date.toDateString(),
+        time: appointment.timeSlot,
+        appointmentId: appointment.id,
+        amount: appointment.amount,
+        cancelReason: reason.trim(),
+        corporateAgent: {
+          companyName: appointment.agent?.companyName || 'ABC Insurance Company',
+          email: appointment.agent?.email || 'corporateagent@slt.lk'
+        }
+      };
+
+      console.log('📧 Sending ACB cancellation emails...');
+
+      // Send patient cancellation email
+      const patientEmailResult = await emailService.sendAppointmentCancellation(appointmentData);
+      
+      // Send corporate cancellation notification
+      const corporateEmailResult = await emailService.sendCorporateCancellationNotification(appointmentData);
+
+      console.log('[SUCCESS] ACB cancellation emails sent:', { 
+        patient: patientEmailResult.success, 
+        corporate: corporateEmailResult.success 
+      });
+
+    } catch (emailError) {
+      console.error('[ERROR] ACB cancellation email failed:', emailError);
+      // Don't fail the operation if email fails
+    }
+
     res.json({
       success: true,
-      message: 'Appointment cancelled successfully',
+      message: 'Appointment cancelled successfully and email notifications sent',
       data: appointment
     });
+    
   } catch (error) {
     console.error('Appointment cancellation error:', error);
     res.status(500).json({

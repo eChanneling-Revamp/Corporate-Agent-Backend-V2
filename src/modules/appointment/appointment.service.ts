@@ -457,13 +457,81 @@ export class AppointmentService {
    * Confirm appointment
    */
   static async confirmAppointment(appointmentId: string, agentId?: string | undefined) {
-    const result = await this.updateAppointment(
+    // First get the appointment with all details for email
+    const where: any = { id: appointmentId };
+    if (agentId) {
+      where.agentId = agentId;
+    }
+
+    const existingAppointment = await prisma.appointment.findUnique({
+      where,
+      include: {
+        doctor: {
+          select: {
+            id: true,
+            name: true,
+            specialty: true,
+            hospital: true,
+          },
+        },
+        agent: {
+          select: {
+            id: true,
+            name: true,
+            companyName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!existingAppointment) {
+      throw new AppError('Appointment not found', 404);
+    }
+
+    // Update the appointment status
+    const updatedAppointment = await this.updateAppointment(
       appointmentId,
       { status: 'CONFIRMED' },
       agentId
     );
 
-    return result;
+    // Send email notifications for ACB confirmation
+    try {
+      const appointmentData = {
+        patientName: existingAppointment.patientName,
+        patientEmail: existingAppointment.patientEmail,
+        patientPhone: existingAppointment.patientPhone,
+        doctorName: existingAppointment.doctor.name,
+        specialty: existingAppointment.doctor.specialty,
+        hospital: existingAppointment.doctor.hospital,
+        date: existingAppointment.date.toDateString(),
+        time: existingAppointment.timeSlot,
+        appointmentId: existingAppointment.id,
+        amount: existingAppointment.amount,
+        corporateAgent: {
+          companyName: existingAppointment.agent.companyName || 'ABC Insurance Company',
+          email: existingAppointment.agent.email || 'corporateagent@slt.lk'
+        }
+      };
+
+      // Send patient confirmation email
+      console.log('📧 Sending ACB confirmation email to patient...');
+      const patientEmailResult = await emailService.sendAppointmentConfirmation(appointmentData);
+      
+      // Send corporate notification email
+      if (process.env.SEND_CORPORATE_NOTIFICATIONS !== 'false') {
+        console.log('📧 Sending ACB confirmation notification to corporate agent...');
+        const corporateEmailResult = await emailService.sendCorporateNotification(appointmentData);
+      }
+
+      console.log('[SUCCESS] ACB confirmation email notifications processed');
+    } catch (emailError) {
+      console.error('[ERROR] ACB confirmation email notifications failed:', emailError);
+      // Don't fail the entire operation if email fails
+    }
+
+    return updatedAppointment;
   }
 
   /**
@@ -482,6 +550,25 @@ export class AppointmentService {
 
     const existingAppointment = await prisma.appointment.findUnique({
       where,
+      include: {
+        doctor: {
+          select: {
+            id: true,
+            name: true,
+            specialty: true,
+            hospital: true,
+          },
+        },
+        agent: {
+          select: {
+            id: true,
+            name: true,
+            companyName: true,
+            email: true,
+          },
+        },
+        payment: true,
+      },
     });
 
     if (!existingAppointment) {
@@ -509,11 +596,48 @@ export class AppointmentService {
             id: true,
             name: true,
             companyName: true,
+            email: true,
           },
         },
         payment: true,
       },
     });
+
+    // Send email notifications for ACB cancellation
+    try {
+      const appointmentData = {
+        patientName: existingAppointment.patientName,
+        patientEmail: existingAppointment.patientEmail,
+        patientPhone: existingAppointment.patientPhone,
+        doctorName: existingAppointment.doctor.name,
+        specialty: existingAppointment.doctor.specialty,
+        hospital: existingAppointment.doctor.hospital,
+        date: existingAppointment.date.toDateString(),
+        time: existingAppointment.timeSlot,
+        appointmentId: existingAppointment.id,
+        amount: existingAppointment.amount,
+        cancelReason: data.reason,
+        corporateAgent: {
+          companyName: existingAppointment.agent.companyName || 'ABC Insurance Company',
+          email: existingAppointment.agent.email || 'corporateagent@slt.lk'
+        }
+      };
+
+      // Send patient cancellation email
+      console.log('📧 Sending ACB cancellation email to patient...');
+      const patientEmailResult = await emailService.sendAppointmentCancellation(appointmentData);
+      
+      // Send corporate cancellation notification
+      if (process.env.SEND_CORPORATE_NOTIFICATIONS !== 'false') {
+        console.log('📧 Sending ACB cancellation notification to corporate agent...');
+        const corporateEmailResult = await emailService.sendCorporateCancellationNotification(appointmentData);
+      }
+
+      console.log('[SUCCESS] ACB cancellation email notifications processed');
+    } catch (emailError) {
+      console.error('[ERROR] ACB cancellation email notifications failed:', emailError);
+      // Don't fail the entire operation if email fails
+    }
 
     // Broadcast update
     broadcastAppointmentUpdate(updatedAppointment);
