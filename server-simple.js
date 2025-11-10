@@ -57,6 +57,125 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('combined'));
 }
 
+// ============================================
+// JWT AUTHENTICATION MIDDLEWARE
+// ============================================
+
+// Middleware to verify JWT token and extract agent info
+const authenticateToken = async (req, res, next) => {
+  try {
+    // Get token from Authorization header
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Format: "Bearer TOKEN"
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'Access token required'
+      });
+    }
+
+    // Verify token
+    const accessSecret = process.env.JWT_ACCESS_SECRET || 'corporate-agent-neon-jwt-access-secret-2024-production-ready-key-v1';
+    
+    jwt.verify(token, accessSecret, async (err, decoded) => {
+      if (err) {
+        console.log('[AUTH] Token verification failed:', err.message);
+        return res.status(403).json({
+          success: false,
+          message: 'Invalid or expired token'
+        });
+      }
+
+      // Get agent from database using userId from token
+      const agent = await prisma.agent.findFirst({
+        where: { userId: decoded.userId },
+        include: { user: true }
+      });
+
+      if (!agent) {
+        return res.status(404).json({
+          success: false,
+          message: 'Agent not found'
+        });
+      }
+
+      // Attach agent info to request object
+      req.agent = agent;
+      req.user = decoded;
+      
+      console.log('[AUTH] Authenticated:', agent.name, '(', agent.email, ')');
+      next();
+    });
+  } catch (error) {
+    console.error('[AUTH] Authentication error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Authentication failed',
+      error: error.message
+    });
+  }
+};
+
+// Optional authentication - continues even without token
+const optionalAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      // No token - use first agent as fallback (for backward compatibility)
+      const agent = await prisma.agent.findFirst({
+        include: { user: true },
+        orderBy: { createdAt: 'asc' }
+      });
+      req.agent = agent;
+      return next();
+    }
+
+    // Token exists - verify it
+    const accessSecret = process.env.JWT_ACCESS_SECRET || 'corporate-agent-neon-jwt-access-secret-2024-production-ready-key-v1';
+    
+    jwt.verify(token, accessSecret, async (err, decoded) => {
+      if (err) {
+        // Invalid token - use fallback
+        const agent = await prisma.agent.findFirst({
+          include: { user: true },
+          orderBy: { createdAt: 'asc' }
+        });
+        req.agent = agent;
+        return next();
+      }
+
+      // Valid token - get agent
+      const agent = await prisma.agent.findFirst({
+        where: { userId: decoded.userId },
+        include: { user: true }
+      });
+
+      req.agent = agent || await prisma.agent.findFirst({
+        include: { user: true },
+        orderBy: { createdAt: 'asc' }
+      });
+      
+      req.user = decoded;
+      next();
+    });
+  } catch (error) {
+    // Error - use fallback
+    const agent = await prisma.agent.findFirst({
+      include: { user: true },
+      orderBy: { createdAt: 'asc' }
+    });
+    req.agent = agent;
+    next();
+  }
+};
+
+// ============================================
+// PUBLIC ENDPOINTS (No authentication required)
+// ============================================
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
@@ -449,7 +568,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.post('/api/auth/change-password', async (req, res) => {
+app.post('/api/auth/change-password', optionalAuth, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
@@ -460,11 +579,8 @@ app.post('/api/auth/change-password', async (req, res) => {
       });
     }
 
-    // Get the first agent (simplified for demo - in production use JWT token)
-    const agent = await prisma.agent.findFirst({
-      include: { user: true },
-      orderBy: { createdAt: 'asc' }
-    });
+    // Agent is already attached to req by optionalAuth middleware
+    const agent = req.agent;
 
     if (!agent || !agent.user) {
       return res.status(404).json({
@@ -588,15 +704,20 @@ app.get('/api/appointments/unpaid', async (req, res) => {
   }
 });
 
-app.post('/api/appointments', async (req, res) => {
+app.post('/api/appointments', optionalAuth, async (req, res) => {
   try {
     console.log('Creating new appointment:', req.body);
     const { doctorId, patientName, patientEmail, patientPhone, date, timeSlot, amount, paymentMethod } = req.body;
     
-    // Get agent from token (simplified for demo)
-    const agent = await prisma.agent.findFirst({
-      orderBy: { createdAt: 'asc' }
-    });
+    // Agent is already attached to req by optionalAuth middleware
+    const agent = req.agent;
+    
+    if (!agent) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
     
     const appointment = await prisma.appointment.create({
       data: {
@@ -690,13 +811,20 @@ app.post('/api/appointments', async (req, res) => {
   }
 });
 
-app.post('/api/appointments/bulk', async (req, res) => {
+app.post('/api/appointments/bulk', optionalAuth, async (req, res) => {
   try {
     console.log('Creating bulk appointments:', req.body);
     const appointments = req.body;
-    const agent = await prisma.agent.findFirst({
-      orderBy: { createdAt: 'asc' }
-    });
+    
+    // Agent is already attached to req by optionalAuth middleware
+    const agent = req.agent;
+    
+    if (!agent) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
     
     const createdAppointments = [];
     let emailsSent = 0;
@@ -1007,14 +1135,11 @@ app.post('/api/appointments/:id/cancel', async (req, res) => {
   }
 });
 
-app.get('/api/profile', async (req, res) => {
+// GET profile - uses optionalAuth for backward compatibility
+app.get('/api/profile', optionalAuth, async (req, res) => {
   try {
-    // For demo: Always return the same agent consistently (ordered by createdAt)
-    // In production, this should use JWT token to identify the logged-in agent
-    const agent = await prisma.agent.findFirst({
-      include: { user: true },
-      orderBy: { createdAt: 'asc' } // Always return the oldest/first created agent
-    });
+    // Agent is already attached to req by optionalAuth middleware
+    const agent = req.agent;
 
     if (!agent) {
       return res.status(404).json({
@@ -1039,13 +1164,11 @@ app.get('/api/profile', async (req, res) => {
   }
 });
 
-app.put('/api/profile', async (req, res) => {
+// PUT profile - uses optionalAuth for backward compatibility
+app.put('/api/profile', optionalAuth, async (req, res) => {
   try {
-    // For demo: Always update the same agent consistently (ordered by createdAt)
-    // In production, this should use JWT token to identify the logged-in agent
-    const agent = await prisma.agent.findFirst({
-      orderBy: { createdAt: 'asc' } // Always return the oldest/first created agent
-    });
+    // Agent is already attached to req by optionalAuth middleware
+    const agent = req.agent;
 
     if (!agent) {
       return res.status(404).json({
@@ -1078,11 +1201,11 @@ app.put('/api/profile', async (req, res) => {
 });
 
 // Get notifications for agent
-app.get('/api/notifications', async (req, res) => {
+app.get('/api/notifications', optionalAuth, async (req, res) => {
   try {
-    const agent = await prisma.agent.findFirst({
-      orderBy: { createdAt: 'asc' }
-    });
+    // Agent is already attached to req by optionalAuth middleware
+    const agent = req.agent;
+    
     if (!agent) {
       return res.status(404).json({
         success: false,
@@ -1144,11 +1267,11 @@ app.patch('/api/notifications/:id/read', async (req, res) => {
 });
 
 // Mark all notifications as read
-app.patch('/api/notifications/read-all', async (req, res) => {
+app.patch('/api/notifications/read-all', optionalAuth, async (req, res) => {
   try {
-    const agent = await prisma.agent.findFirst({
-      orderBy: { createdAt: 'asc' }
-    });
+    // Agent is already attached to req by optionalAuth middleware
+    const agent = req.agent;
+    
     if (!agent) {
       return res.status(404).json({
         success: false,
