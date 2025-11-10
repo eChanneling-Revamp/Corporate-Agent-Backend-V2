@@ -264,11 +264,13 @@ app.get('/api/dashboard', async (req, res) => {
       prisma.appointment.count({ where: { status: 'CANCELLED' } })
     ]);
 
-    // Get revenue from paid appointments
-    const revenueData = await prisma.payment.aggregate({
-      where: { status: 'PAID' },
+    // Get revenue from CONFIRMED appointments (as per requirements)
+    const revenueData = await prisma.appointment.aggregate({
+      where: { status: 'CONFIRMED' },
       _sum: { amount: true }
     });
+
+    console.log('Revenue calculated from confirmed appointments:', revenueData._sum.amount);
 
     // Get active doctors count
     const activeDoctors = await prisma.doctor.count({
@@ -596,6 +598,22 @@ app.post('/api/appointments', async (req, res) => {
       // Don't fail the appointment creation if email fails
     }
 
+    // Create notification for agent
+    try {
+      await prisma.notification.create({
+        data: {
+          agentId: agent.id,
+          type: 'APPOINTMENT_RECEIVED',
+          title: 'New Appointment Received',
+          message: `${appointment.patientName} booked an appointment with ${appointment.doctor.name} for ${appointment.date.toDateString()} at ${appointment.timeSlot}`,
+          appointmentId: appointment.id
+        }
+      });
+      console.log('✅ Notification created for appointment');
+    } catch (notifError) {
+      console.error('[WARNING] Failed to create notification:', notifError);
+    }
+
     res.json({
       success: true,
       message: 'Appointment created successfully',
@@ -679,6 +697,21 @@ app.post('/api/appointments/bulk', async (req, res) => {
     }
 
     console.log(`[SUCCESS] Bulk creation complete: ${createdAppointments.length} appointments, ${emailsSent} emails sent`);
+
+    // Create notification for bulk booking
+    try {
+      await prisma.notification.create({
+        data: {
+          agentId: agent.id,
+          type: 'APPOINTMENT_RECEIVED',
+          title: 'Bulk Appointments Created',
+          message: `Successfully created ${createdAppointments.length} appointments in bulk booking`
+        }
+      });
+      console.log('✅ Notification created for bulk appointments');
+    } catch (notifError) {
+      console.error('[WARNING] Failed to create notification:', notifError);
+    }
 
     res.json({
       success: true,
@@ -765,6 +798,22 @@ app.post('/api/appointments/:id/confirm', async (req, res) => {
     } catch (emailError) {
       console.error('[ERROR] ACB confirmation email failed:', emailError);
       // Don't fail the operation if email fails
+    }
+
+    // Create notification for confirmation
+    try {
+      await prisma.notification.create({
+        data: {
+          agentId: appointment.agentId,
+          type: 'APPOINTMENT_CONFIRMED',
+          title: 'Appointment Confirmed',
+          message: `Appointment for ${appointment.patientName} with ${appointment.doctor.name} has been confirmed for ${appointment.date.toDateString()} at ${appointment.timeSlot}`,
+          appointmentId: appointment.id
+        }
+      });
+      console.log('✅ Notification created for appointment confirmation');
+    } catch (notifError) {
+      console.error('[WARNING] Failed to create notification:', notifError);
     }
 
     res.json({
@@ -863,6 +912,22 @@ app.post('/api/appointments/:id/cancel', async (req, res) => {
       // Don't fail the operation if email fails
     }
 
+    // Create notification for cancellation
+    try {
+      await prisma.notification.create({
+        data: {
+          agentId: appointment.agentId,
+          type: 'APPOINTMENT_CANCELLED',
+          title: 'Appointment Cancelled',
+          message: `Appointment for ${appointment.patientName} with ${appointment.doctor.name} on ${appointment.date.toDateString()} at ${appointment.timeSlot} has been cancelled. Reason: ${reason.trim()}`,
+          appointmentId: appointment.id
+        }
+      });
+      console.log('✅ Notification created for appointment cancellation');
+    } catch (notifError) {
+      console.error('[WARNING] Failed to create notification:', notifError);
+    }
+
     res.json({
       success: true,
       message: 'Appointment cancelled successfully and email notifications sent',
@@ -916,6 +981,103 @@ app.put('/api/profile', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to update profile',
+      error: error.message,
+    });
+  }
+});
+
+// Get notifications for agent
+app.get('/api/notifications', async (req, res) => {
+  try {
+    const agent = await prisma.agent.findFirst();
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Agent not found',
+      });
+    }
+
+    const notifications = await prisma.notification.findMany({
+      where: { agentId: agent.id },
+      orderBy: { createdAt: 'desc' },
+      take: 50 // Limit to 50 most recent
+    });
+
+    const unreadCount = await prisma.notification.count({
+      where: {
+        agentId: agent.id,
+        isRead: false
+      }
+    });
+
+    res.json({
+      success: true,
+      data: notifications,
+      unreadCount
+    });
+  } catch (error) {
+    console.error('[ERROR] Failed to fetch notifications:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch notifications',
+      error: error.message,
+    });
+  }
+});
+
+// Mark notification as read
+app.patch('/api/notifications/:id/read', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const notification = await prisma.notification.update({
+      where: { id },
+      data: { isRead: true }
+    });
+
+    res.json({
+      success: true,
+      message: 'Notification marked as read',
+      data: notification
+    });
+  } catch (error) {
+    console.error('[ERROR] Failed to mark notification as read:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark notification as read',
+      error: error.message,
+    });
+  }
+});
+
+// Mark all notifications as read
+app.patch('/api/notifications/read-all', async (req, res) => {
+  try {
+    const agent = await prisma.agent.findFirst();
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Agent not found',
+      });
+    }
+
+    await prisma.notification.updateMany({
+      where: {
+        agentId: agent.id,
+        isRead: false
+      },
+      data: { isRead: true }
+    });
+
+    res.json({
+      success: true,
+      message: 'All notifications marked as read'
+    });
+  } catch (error) {
+    console.error('[ERROR] Failed to mark all notifications as read:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark all notifications as read',
       error: error.message,
     });
   }
