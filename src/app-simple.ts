@@ -187,6 +187,11 @@ app.get('/api/appointments/unpaid', async (req, res) => {
   try {
     console.log('API call to /api/appointments/unpaid');
     
+    // Add no-cache headers to prevent stale data
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    
     const appointments = await prisma.appointment.findMany({
       where: {
         AND: [

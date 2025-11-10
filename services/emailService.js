@@ -5,10 +5,18 @@ const path = require('path');
 
 class EmailService {
   constructor() {
+    // Log SMTP configuration on initialization
+    console.log('[EmailService] Initializing with config:', {
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: process.env.SMTP_PORT || 587,
+      user: process.env.SMTP_USER ? 'configured' : 'MISSING',
+      pass: process.env.SMTP_PASS ? 'configured' : 'MISSING'
+    });
+    
     // Initialize transporter with SMTP configuration
     this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: process.env.SMTP_PORT || 587,
+      port: parseInt(process.env.SMTP_PORT) || 587,
       secure: false, // true for 465, false for other ports
       auth: {
         user: process.env.SMTP_USER, // Your email
@@ -23,6 +31,12 @@ class EmailService {
   // Send appointment received email (initial booking notification)
   async sendAppointmentReceived(appointmentData) {
     try {
+      // Check if email service is configured
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        console.error('[EmailService] ERROR: SMTP credentials not configured!');
+        return { success: false, error: 'SMTP credentials not configured' };
+      }
+      
       const { 
         patientName, 
         patientEmail, 
@@ -35,6 +49,8 @@ class EmailService {
         amount,
         corporateAgent 
       } = appointmentData;
+
+      console.log('[EmailService] Sending appointment received email to:', patientEmail);
 
       const mailOptions = {
         from: `"eChannelling Corporate Agent" <${process.env.SMTP_USER}>`,
@@ -45,10 +61,11 @@ class EmailService {
       };
 
       const info = await this.transporter.sendMail(mailOptions);
-      console.log('Appointment received email sent:', info.messageId);
+      console.log('[EmailService] SUCCESS: Appointment received email sent:', info.messageId);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      console.error('Email sending failed:', error);
+      console.error('[EmailService] ERROR: Email sending failed:', error);
+      console.error('[EmailService] Error details:', error.message);
       return { success: false, error: error.message };
     }
   }
@@ -56,6 +73,12 @@ class EmailService {
   // Send ACB confirmation email (when corporate agent confirms the appointment)
   async sendACBConfirmation(appointmentData) {
     try {
+      // Check if email service is configured
+      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        console.error('[EmailService] ERROR: SMTP credentials not configured!');
+        return { success: false, error: 'SMTP credentials not configured' };
+      }
+      
       const { 
         patientName, 
         patientEmail, 
@@ -69,6 +92,8 @@ class EmailService {
         corporateAgent 
       } = appointmentData;
 
+      console.log('[EmailService] Sending ACB confirmation email to:', patientEmail);
+
       const mailOptions = {
         from: `"eChannelling Corporate Agent" <${process.env.SMTP_USER}>`,
         to: patientEmail,
@@ -78,10 +103,11 @@ class EmailService {
       };
 
       const info = await this.transporter.sendMail(mailOptions);
-      console.log('ACB confirmation email sent:', info.messageId);
+      console.log('[EmailService] SUCCESS: ACB confirmation email sent:', info.messageId);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      console.error('ACB confirmation email failed:', error);
+      console.error('[EmailService] ERROR: ACB confirmation email failed:', error);
+      console.error('[EmailService] Error details:', error.message);
       return { success: false, error: error.message };
     }
   }
@@ -788,4 +814,8 @@ Powered by ${corporateAgent.companyName}
   }
 }
 
-module.exports = new EmailService();
+// Initialize and export the email service
+const emailServiceInstance = new EmailService();
+console.log('[EmailService] Module loaded and initialized successfully');
+
+module.exports = emailServiceInstance;
