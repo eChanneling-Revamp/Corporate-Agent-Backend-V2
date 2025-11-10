@@ -449,6 +449,65 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+app.post('/api/auth/change-password', async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password and new password are required',
+      });
+    }
+
+    // Get the first agent (simplified for demo - in production use JWT token)
+    const agent = await prisma.agent.findFirst({
+      include: { user: true },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    if (!agent || !agent.user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    // Verify current password
+    const isValidPassword = await bcrypt.compare(currentPassword, agent.user.password);
+    
+    if (!isValidPassword) {
+      return res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect',
+      });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await prisma.user.update({
+      where: { id: agent.user.id },
+      data: { password: hashedPassword }
+    });
+
+    console.log('[AUTH] Password changed successfully for user:', agent.user.email);
+
+    res.json({
+      success: true,
+      message: 'Password changed successfully',
+    });
+  } catch (error) {
+    console.error('[ERROR] Change password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to change password',
+      error: error.message,
+    });
+  }
+});
+
 app.post('/api/auth/logout', async (req, res) => {
   try {
     const { refreshToken } = req.body;
@@ -535,7 +594,9 @@ app.post('/api/appointments', async (req, res) => {
     const { doctorId, patientName, patientEmail, patientPhone, date, timeSlot, amount, paymentMethod } = req.body;
     
     // Get agent from token (simplified for demo)
-    const agent = await prisma.agent.findFirst();
+    const agent = await prisma.agent.findFirst({
+      orderBy: { createdAt: 'asc' }
+    });
     
     const appointment = await prisma.appointment.create({
       data: {
@@ -633,7 +694,9 @@ app.post('/api/appointments/bulk', async (req, res) => {
   try {
     console.log('Creating bulk appointments:', req.body);
     const appointments = req.body;
-    const agent = await prisma.agent.findFirst();
+    const agent = await prisma.agent.findFirst({
+      orderBy: { createdAt: 'asc' }
+    });
     
     const createdAppointments = [];
     let emailsSent = 0;
@@ -946,15 +1009,28 @@ app.post('/api/appointments/:id/cancel', async (req, res) => {
 
 app.get('/api/profile', async (req, res) => {
   try {
+    // For demo: Always return the same agent consistently (ordered by createdAt)
+    // In production, this should use JWT token to identify the logged-in agent
     const agent = await prisma.agent.findFirst({
-      include: { user: true }
+      include: { user: true },
+      orderBy: { createdAt: 'asc' } // Always return the oldest/first created agent
     });
+
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Agent not found'
+      });
+    }
+
+    console.log('[PROFILE] Returning agent:', agent.name, '(ID:', agent.id.substring(0, 8) + '...)');
 
     res.json({
       success: true,
       data: agent
     });
   } catch (error) {
+    console.error('[ERROR] Profile fetch error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch profile',
@@ -965,12 +1041,26 @@ app.get('/api/profile', async (req, res) => {
 
 app.put('/api/profile', async (req, res) => {
   try {
-    const agent = await prisma.agent.findFirst();
+    // For demo: Always update the same agent consistently (ordered by createdAt)
+    // In production, this should use JWT token to identify the logged-in agent
+    const agent = await prisma.agent.findFirst({
+      orderBy: { createdAt: 'asc' } // Always return the oldest/first created agent
+    });
+
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Agent not found'
+      });
+    }
+
     const updatedAgent = await prisma.agent.update({
       where: { id: agent.id },
       data: req.body,
       include: { user: true }
     });
+
+    console.log('[PROFILE] Updated agent:', updatedAgent.name);
 
     res.json({
       success: true,
@@ -978,6 +1068,7 @@ app.put('/api/profile', async (req, res) => {
       data: updatedAgent
     });
   } catch (error) {
+    console.error('[ERROR] Profile update error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update profile',
@@ -989,7 +1080,9 @@ app.put('/api/profile', async (req, res) => {
 // Get notifications for agent
 app.get('/api/notifications', async (req, res) => {
   try {
-    const agent = await prisma.agent.findFirst();
+    const agent = await prisma.agent.findFirst({
+      orderBy: { createdAt: 'asc' }
+    });
     if (!agent) {
       return res.status(404).json({
         success: false,
@@ -1053,7 +1146,9 @@ app.patch('/api/notifications/:id/read', async (req, res) => {
 // Mark all notifications as read
 app.patch('/api/notifications/read-all', async (req, res) => {
   try {
-    const agent = await prisma.agent.findFirst();
+    const agent = await prisma.agent.findFirst({
+      orderBy: { createdAt: 'asc' }
+    });
     if (!agent) {
       return res.status(404).json({
         success: false,
