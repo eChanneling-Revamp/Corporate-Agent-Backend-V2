@@ -329,6 +329,12 @@ app.post('/api/appointments', async (req, res) => {
     // Send email notification
     try {
       console.log('Sending appointment received email to:', patientEmail);
+      console.log('SMTP Configuration Check:', {
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: process.env.SMTP_PORT || 587,
+        user: process.env.SMTP_USER ? 'configured' : 'missing',
+        pass: process.env.SMTP_PASS ? 'configured' : 'missing'
+      });
       
       // Import nodemailer dynamically to avoid startup issues if not configured
       const nodemailer = require('nodemailer');
@@ -377,14 +383,17 @@ app.post('/api/appointments', async (req, res) => {
 
       // Send email
       if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-        await transporter.sendMail(mailOptions);
+        const emailResult = await transporter.sendMail(mailOptions);
         console.log('Appointment received email sent successfully to:', patientEmail);
+        console.log('Email message ID:', emailResult.messageId);
       } else {
-        console.log('Email service not configured, skipping email notification');
+        console.log('WARNING: Email service not configured - SMTP credentials missing');
+        console.log('Please set SMTP_USER and SMTP_PASS environment variables on Render');
       }
       
     } catch (emailError) {
-      console.error('Failed to send email:', emailError);
+      console.error('ERROR: Failed to send email:', emailError);
+      console.error('Email error details:', emailError instanceof Error ? emailError.message : emailError);
       // Don't fail the appointment creation if email fails
     }
 
@@ -480,12 +489,15 @@ app.post('/api/appointments/:id/cancel', async (req, res) => {
       };
 
       console.log('Sending ACB cancellation emails...');
+      console.log('Email service configured:', process.env.SMTP_USER ? 'Yes' : 'No');
 
       // Send patient cancellation email
       const patientEmailResult = await emailService.sendAppointmentCancellation(appointmentData);
+      console.log('Patient cancellation email result:', patientEmailResult);
       
       // Send corporate cancellation notification
       const corporateEmailResult = await emailService.sendCorporateCancellationNotification(appointmentData);
+      console.log('Corporate cancellation email result:', corporateEmailResult);
 
       console.log('[SUCCESS] ACB cancellation emails sent:', { 
         patient: patientEmailResult.success, 
@@ -493,7 +505,8 @@ app.post('/api/appointments/:id/cancel', async (req, res) => {
       });
 
     } catch (emailError) {
-      console.error('ACB cancellation email failed:', emailError);
+      console.error('ERROR: ACB cancellation email failed:', emailError);
+      console.error('Email error details:', emailError instanceof Error ? emailError.message : emailError);
       // Don't fail the operation if email fails
     }
 
@@ -570,12 +583,15 @@ app.post('/api/appointments/:id/confirm', async (req, res) => {
       };
 
       console.log('Sending ACB confirmation emails...');
+      console.log('Email service configured:', process.env.SMTP_USER ? 'Yes' : 'No');
       
       // Send patient confirmation email
       const patientEmailResult = await emailService.sendACBConfirmation(appointmentData);
+      console.log('Patient confirmation email result:', patientEmailResult);
       
       // Send corporate notification email
       const corporateEmailResult = await emailService.sendCorporateNotification(appointmentData);
+      console.log('Corporate notification email result:', corporateEmailResult);
 
       console.log('[SUCCESS] ACB confirmation emails sent:', { 
         patient: patientEmailResult.success, 
@@ -583,7 +599,8 @@ app.post('/api/appointments/:id/confirm', async (req, res) => {
       });
 
     } catch (emailError) {
-      console.error('ACB confirmation email failed:', emailError);
+      console.error('ERROR: ACB confirmation email failed:', emailError);
+      console.error('Email error details:', emailError instanceof Error ? emailError.message : emailError);
       // Don't fail the operation if email fails
     }
 
