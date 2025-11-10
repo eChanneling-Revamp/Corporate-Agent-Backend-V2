@@ -545,11 +545,18 @@ app.post('/api/appointments', async (req, res) => {
         date: new Date(date),
         timeSlot,
         amount: parseFloat(amount),
-        status: 'CONFIRMED'
+        status: 'PENDING'
       },
       include: {
         doctor: true
       }
+    });
+
+    console.log('✅ Appointment created successfully with PENDING status:', {
+      id: appointment.id,
+      status: appointment.status,
+      patient: appointment.patientName,
+      doctor: appointment.doctor.name
     });
 
     // Send email notifications
@@ -571,17 +578,18 @@ app.post('/api/appointments', async (req, res) => {
         }
       };
 
-      // Send patient confirmation email
-      console.log('[EMAIL] Sending appointment confirmation email...');
-      const patientEmailResult = await emailService.sendAppointmentConfirmation(appointmentData);
+      // Send "appointment received" email (pending confirmation)
+      console.log('[EMAIL] Sending appointment received email (pending confirmation)...');
+      const patientEmailResult = await emailService.sendAppointmentReceived(appointmentData);
       
-      // Send corporate notification email
-      console.log('[EMAIL] Sending corporate notification email...');
-      const corporateEmailResult = await emailService.sendCorporateNotification(appointmentData);
+      if (patientEmailResult.success) {
+        console.log('✅ Appointment received email sent successfully:', patientEmailResult.messageId);
+      } else {
+        console.log('⚠ Appointment received email failed:', patientEmailResult.error);
+      }
 
-      console.log('[SUCCESS] Email notifications processed:', { 
-        patient: patientEmailResult.success, 
-        corporate: corporateEmailResult.success 
+      console.log('[SUCCESS] Email notification processed:', { 
+        patient: patientEmailResult.success
       });
     } catch (emailError) {
       console.error('[WARNING] Email sending failed but appointment created:', emailError);
@@ -628,10 +636,12 @@ app.post('/api/appointments/bulk', async (req, res) => {
             date: new Date(appt.date),
             timeSlot: appt.time,
             amount: doctor.consultationFee,
-            status: 'CONFIRMED'
+            status: 'PENDING'
           },
           include: { doctor: true }
         });
+
+        console.log(`✅ Bulk appointment created with PENDING status: ${appointment.id} for ${appt.patientName}`);
         
         createdAppointments.push(appointment);
 
@@ -654,10 +664,13 @@ app.post('/api/appointments/bulk', async (req, res) => {
             }
           };
 
-          console.log(`[EMAIL] Sending confirmation email for appointment ${appointment.id}...`);
-          const emailResult = await emailService.sendAppointmentConfirmation(appointmentData);
+          console.log(`[EMAIL] Sending appointment received email for ${appointment.id} (pending confirmation)...`);
+          const emailResult = await emailService.sendAppointmentReceived(appointmentData);
           if (emailResult.success) {
             emailsSent++;
+            console.log(`✓ Appointment received email sent to ${appointment.patientEmail}`);
+          } else {
+            console.log(`⚠ Email failed:`, emailResult.error);
           }
         } catch (emailError) {
           console.error(`[WARNING] Email failed for appointment ${appointment.id}:`, emailError);

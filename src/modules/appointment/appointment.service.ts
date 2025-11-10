@@ -194,7 +194,7 @@ export class AppointmentService {
 
           results.created.push(appointment);
 
-          // Send email notification for each appointment
+          // Send email notification for each appointment (initial received - pending confirmation)
           try {
             const emailData = {
               patientName: appointment.patientName,
@@ -213,8 +213,8 @@ export class AppointmentService {
               }
             };
 
-            console.log(`📧 Sending confirmation email for bulk appointment ${appointment.id}...`);
-            await emailService.sendAppointmentConfirmation(emailData);
+            console.log(`📧 Sending "appointment received" email for bulk appointment ${appointment.id}...`);
+            await emailService.sendAppointmentReceived(emailData);
           } catch (emailError) {
             console.error(`⚠️ Email failed for appointment ${appointment.id}:`, emailError);
           }

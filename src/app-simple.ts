@@ -154,22 +154,30 @@ app.get('/api/appointments', async (req, res) => {
     console.log(`Found ${appointments.length} appointments in database`);
 
     // Transform database appointments to frontend format
-    const transformedAppointments = appointments.map((appointment: any) => ({
-      id: appointment.id,
-      doctorName: appointment.doctor.name,
-      specialty: appointment.doctor.specialty,
-      hospital: appointment.doctor.hospital,
-      patientName: appointment.patientName,
-      patientEmail: appointment.patientEmail,
-      patientPhone: appointment.patientPhone,
-      date: appointment.date.toISOString().split('T')[0], // Format as YYYY-MM-DD
-      time: appointment.timeSlot,
-      status: appointment.status.toLowerCase(),
-      amount: appointment.amount,
-      paymentStatus: appointment.payment ? appointment.payment.status.toLowerCase() : 'pending',
-      notes: appointment.notes || '',
-      createdAt: appointment.createdAt
-    }));
+    const transformedAppointments = appointments.map((appointment: any) => {
+      const status = appointment.status.toLowerCase();
+      console.log(`Appointment ${appointment.id}: status=${appointment.status} (${status}), patient=${appointment.patientName}`);
+      
+      return {
+        id: appointment.id,
+        doctorName: appointment.doctor.name,
+        specialty: appointment.doctor.specialty,
+        hospital: appointment.doctor.hospital,
+        patientName: appointment.patientName,
+        patientEmail: appointment.patientEmail,
+        patientPhone: appointment.patientPhone,
+        date: appointment.date.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        time: appointment.timeSlot,
+        status: status,
+        amount: appointment.amount,
+        paymentStatus: appointment.payment ? appointment.payment.status.toLowerCase() : 'pending',
+        notes: appointment.notes || '',
+        createdAt: appointment.createdAt
+      };
+    });
+
+    console.log(`Returning ${transformedAppointments.length} appointments with statuses:`, 
+      transformedAppointments.map(a => `${a.id}:${a.status}`).join(', '));
 
     res.json(transformedAppointments);
   } catch (error) {
@@ -329,71 +337,41 @@ app.post('/api/appointments', async (req, res) => {
       }
     });
 
-    console.log('Appointment created successfully:', appointment.id);
+    console.log('✅ Appointment created successfully with PENDING status:', {
+      id: appointment.id,
+      status: appointment.status,
+      patient: appointment.patientName,
+      doctor: doctor.name
+    });
 
-    // Send email notification
+    // Send "appointment received" email (pending confirmation)
     try {
       console.log('Sending appointment received email to:', patientEmail);
-      console.log('SMTP Configuration Check:', {
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: process.env.SMTP_PORT || 587,
-        user: process.env.SMTP_USER ? 'configured' : 'missing',
-        pass: process.env.SMTP_PASS ? 'configured' : 'missing'
-      });
       
-      // Import nodemailer dynamically to avoid startup issues if not configured
-      const nodemailer = require('nodemailer');
-      
-      // Create transporter
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: process.env.SMTP_PORT || 587,
-        secure: false, // true for 465, false for other ports
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      });
-
-      // Email content
-      const mailOptions = {
-        from: process.env.EMAIL_FROM || 'echanneling.revamp@gmail.com',
-        to: patientEmail,
-        subject: 'Appointment Received - eChannelling Corporate Agent',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #2563eb;">Appointment Received</h2>
-            <p>Dear ${patientName},</p>
-            <p>Your appointment request has been received and is pending confirmation by our corporate agent. Here are the details:</p>
-            <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <p><strong>Doctor:</strong> ${doctor.name}</p>
-              <p><strong>Specialty:</strong> ${doctor.specialty}</p>
-              <p><strong>Hospital:</strong> ${doctor.hospital}</p>
-              <p><strong>Date:</strong> ${new Date(date).toLocaleDateString()}</p>
-              <p><strong>Time:</strong> ${timeSlot}</p>
-              <p><strong>Consultation Fee:</strong> LKR ${doctor.consultationFee}</p>
-              <p><strong>Appointment ID:</strong> ${appointment.id}</p>
-            </div>
-            <p><strong>Important:</strong> Your appointment is pending confirmation. You will receive a confirmation email once approved by our corporate agent.</p>
-            <p>If you need to cancel or have any questions, please contact us.</p>
-            <p>Thank you for choosing our services!</p>
-            <hr>
-            <p style="font-size: 12px; color: #6b7280;">
-              This is an automated message from eChannelling Corporate Agent System.<br>
-              For support, contact: ${process.env.EMAIL_FROM}
-            </p>
-          </div>
-        `
+      const emailData = {
+        patientName: appointment.patientName,
+        patientEmail: appointment.patientEmail,
+        patientPhone: appointment.patientPhone,
+        doctorName: doctor.name,
+        specialty: doctor.specialty,
+        hospital: doctor.hospital,
+        date: appointment.date.toDateString(),
+        time: appointment.timeSlot,
+        appointmentId: appointment.id,
+        amount: appointment.amount,
+        corporateAgent: {
+          companyName: defaultAgent.companyName || 'ABC Insurance Company',
+          email: defaultAgent.email || 'corporateagent@slt.lk'
+        }
       };
 
-      // Send email
-      if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-        const emailResult = await transporter.sendMail(mailOptions);
-        console.log('Appointment received email sent successfully to:', patientEmail);
-        console.log('Email message ID:', emailResult.messageId);
+      console.log('Sending appointment received email via emailService...');
+      const emailResult = await emailService.sendAppointmentReceived(emailData);
+      
+      if (emailResult.success) {
+        console.log('✓ Appointment received email sent successfully:', emailResult.messageId);
       } else {
-        console.log('WARNING: Email service not configured - SMTP credentials missing');
-        console.log('Please set SMTP_USER and SMTP_PASS environment variables on Render');
+        console.log('⚠ Appointment received email failed:', emailResult.error);
       }
       
     } catch (emailError) {
@@ -424,6 +402,201 @@ app.post('/api/appointments', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to create appointment',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Bulk create appointments endpoint
+app.post('/api/appointments/bulk', async (req, res) => {
+  try {
+    console.log('Bulk creating appointments:', req.body);
+    
+    const appointments = req.body;
+    
+    if (!Array.isArray(appointments) || appointments.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid request: expected array of appointments'
+      });
+    }
+
+    const results = {
+      created: [] as any[],
+      failed: [] as any[]
+    };
+
+    // Get default agent
+    const defaultAgent = await prisma.agent.findFirst({
+      where: { isActive: true }
+    });
+
+    if (!defaultAgent) {
+      return res.status(400).json({
+        success: false,
+        message: 'No active agent found'
+      });
+    }
+
+    // Process each appointment
+    for (const apt of appointments) {
+      try {
+        const { doctorName, patientName, patientEmail, patientPhone, date, time } = apt;
+
+        // Validate required fields
+        if (!doctorName || !patientName || !patientEmail || !patientPhone || !date || !time) {
+          results.failed.push({
+            data: apt,
+            error: 'Missing required fields'
+          });
+          continue;
+        }
+
+        // Find doctor by name
+        const doctor = await prisma.doctor.findFirst({
+          where: { 
+            name: doctorName,
+            isActive: true 
+          }
+        });
+
+        if (!doctor) {
+          results.failed.push({
+            data: apt,
+            error: `Doctor ${doctorName} not found`
+          });
+          continue;
+        }
+
+        // Check if time slot is available
+        const existingAppointment = await prisma.appointment.findFirst({
+          where: {
+            doctorId: doctor.id,
+            date: new Date(date),
+            timeSlot: time,
+            status: { in: ['PENDING', 'CONFIRMED'] }
+          }
+        });
+
+        if (existingAppointment) {
+          results.failed.push({
+            data: apt,
+            error: 'Time slot not available'
+          });
+          continue;
+        }
+
+        // Create appointment
+        const appointment = await prisma.appointment.create({
+          data: {
+            agentId: defaultAgent.id,
+            doctorId: doctor.id,
+            patientName,
+            patientEmail,
+            patientPhone,
+            date: new Date(date),
+            timeSlot: time,
+            amount: doctor.consultationFee,
+            notes: '',
+            status: 'PENDING'
+          },
+          include: {
+            doctor: true,
+            agent: true
+          }
+        });
+
+        console.log(`✅ Bulk appointment created with PENDING status: ${appointment.id} for ${patientName}`);
+
+        results.created.push({
+          id: appointment.id,
+          doctorName: doctor.name,
+          patientName: appointment.patientName,
+          date: appointment.date.toISOString().split('T')[0],
+          time: appointment.timeSlot,
+          status: appointment.status
+        });
+
+        // Send "appointment received" email (pending confirmation)
+        try {
+          const nodemailer = require('nodemailer');
+          
+          if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+            const transporter = nodemailer.createTransport({
+              host: process.env.SMTP_HOST || 'smtp.gmail.com',
+              port: process.env.SMTP_PORT || 587,
+              secure: false,
+              auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS,
+              },
+            });
+
+            const mailOptions = {
+              from: process.env.EMAIL_FROM || 'echanneling.revamp@gmail.com',
+              to: patientEmail,
+              subject: 'Appointment Received - Confirmation Pending',
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h2 style="color: #f59e0b;">Appointment Received</h2>
+                  <p>Dear ${patientName},</p>
+                  <p>Your appointment request has been received and is <strong>pending confirmation</strong> by our corporate agent.</p>
+                  <div style="background-color: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border: 2px solid #f59e0b;">
+                    <p><strong>Doctor:</strong> ${doctor.name}</p>
+                    <p><strong>Specialty:</strong> ${doctor.specialty}</p>
+                    <p><strong>Hospital:</strong> ${doctor.hospital}</p>
+                    <p><strong>Date:</strong> ${new Date(date).toLocaleDateString()}</p>
+                    <p><strong>Time:</strong> ${time}</p>
+                    <p><strong>Consultation Fee:</strong> LKR ${doctor.consultationFee}</p>
+                    <p><strong>Appointment ID:</strong> ${appointment.id}</p>
+                    <p style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f59e0b;">
+                      <strong>Status:</strong> <span style="background: #f59e0b; color: white; padding: 4px 12px; border-radius: 12px;">PENDING CONFIRMATION</span>
+                    </p>
+                  </div>
+                  <p><strong>What happens next?</strong></p>
+                  <ul>
+                    <li>Your corporate agent will review and confirm your appointment</li>
+                    <li>You will receive a confirmation email once approved</li>
+                    <li>Payment is handled by your corporate agent</li>
+                  </ul>
+                  <p>Thank you for choosing our services!</p>
+                  <hr>
+                  <p style="font-size: 12px; color: #6b7280;">
+                    This is an automated message from eChannelling Corporate Agent System.
+                  </p>
+                </div>
+              `
+            };
+
+            await transporter.sendMail(mailOptions);
+            console.log(`Appointment received email sent to ${patientEmail} for appointment ${appointment.id}`);
+          }
+        } catch (emailError) {
+          console.error(`Email failed for appointment ${appointment.id}:`, emailError);
+          // Don't fail the creation if email fails
+        }
+
+      } catch (error) {
+        results.failed.push({
+          data: apt,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    console.log(`Bulk creation complete: ${results.created.length} created, ${results.failed.length} failed`);
+
+    return res.status(201).json({
+      success: true,
+      message: `Bulk appointment creation complete. ${results.created.length} created, ${results.failed.length} failed`,
+      data: results
+    });
+
+  } catch (error) {
+    console.error('Bulk appointment creation error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to create bulk appointments',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
