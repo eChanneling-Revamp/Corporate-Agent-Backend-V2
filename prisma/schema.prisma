@@ -157,10 +157,31 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model Notification {
+  id             String           @id @default(uuid())
+  agentId        String
+  type           NotificationType
+  title          String
+  message        String
+  appointmentId  String?
+  isRead         Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@map("notifications")
+  @@index([agentId, isRead])
+}
+
 enum Role {
   ADMIN
   AGENT
   MANAGER
+}
+
+enum NotificationType {
+  APPOINTMENT_RECEIVED
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_CANCELLED
 }
 
 enum AppointmentStatus {
