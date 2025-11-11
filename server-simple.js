@@ -350,11 +350,15 @@ app.get('/api/appointments', async (req, res) => {
       patientName: appointment.patientName,
       patientEmail: appointment.patientEmail,
       patientPhone: appointment.patientPhone,
+      patientNIC: appointment.patientNIC,
       date: appointment.date.toISOString().split('T')[0], // Format as YYYY-MM-DD
       time: appointment.timeSlot,
       status: appointment.status.toLowerCase(),
       amount: appointment.amount,
       paymentStatus: appointment.payment ? appointment.payment.status.toLowerCase() : 'pending',
+      paymentMethod: appointment.paymentMethod, // Include payment method
+      sltPhoneNumber: appointment.sltPhoneNumber,
+      employeeNIC: appointment.employeeNIC,
       notes: appointment.notes || '',
       createdAt: appointment.createdAt
     }));
@@ -396,6 +400,69 @@ app.get('/api/dashboard', async (req, res) => {
       where: { isActive: true }
     });
 
+    // Calculate growth percentages based on time periods
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+    // Appointments growth (last 30 days vs previous 30 days)
+    const [appointmentsLast30Days, appointmentsPrevious30Days] = await Promise.all([
+      prisma.appointment.count({
+        where: { createdAt: { gte: thirtyDaysAgo } }
+      }),
+      prisma.appointment.count({
+        where: { 
+          createdAt: { 
+            gte: sixtyDaysAgo,
+            lt: thirtyDaysAgo 
+          } 
+        }
+      })
+    ]);
+
+    const appointmentsChange = appointmentsPrevious30Days > 0 
+      ? ((appointmentsLast30Days - appointmentsPrevious30Days) / appointmentsPrevious30Days * 100).toFixed(1)
+      : (appointmentsLast30Days > 0 ? 100 : 0);
+
+    // Revenue growth (last 30 days vs previous 30 days)
+    const [revenueLast30Days, revenuePrevious30Days] = await Promise.all([
+      prisma.appointment.aggregate({
+        where: { 
+          status: 'CONFIRMED',
+          createdAt: { gte: thirtyDaysAgo }
+        },
+        _sum: { amount: true }
+      }),
+      prisma.appointment.aggregate({
+        where: { 
+          status: 'CONFIRMED',
+          createdAt: { 
+            gte: sixtyDaysAgo,
+            lt: thirtyDaysAgo 
+          }
+        },
+        _sum: { amount: true }
+      })
+    ]);
+
+    const revenueLastMonth = revenueLast30Days._sum.amount || 0;
+    const revenuePreviousMonth = revenuePrevious30Days._sum.amount || 0;
+    const revenueChange = revenuePreviousMonth > 0
+      ? ((revenueLastMonth - revenuePreviousMonth) / revenuePreviousMonth * 100).toFixed(1)
+      : (revenueLastMonth > 0 ? 100 : 0);
+
+    // Doctor growth (doctors added in last 30 days)
+    const doctorsAddedLast30Days = await prisma.doctor.count({
+      where: { 
+        isActive: true,
+        createdAt: { gte: thirtyDaysAgo }
+      }
+    });
+    
+    const doctorsChange = activeDoctors > 0
+      ? ((doctorsAddedLast30Days / activeDoctors) * 100).toFixed(1)
+      : 0;
+
     const stats = {
       totalAppointments,
       pendingConfirmations,
@@ -403,8 +470,9 @@ app.get('/api/dashboard', async (req, res) => {
       cancelledAppointments,
       revenue: revenueData._sum.amount || 0,
       activeDoctors,
-      appointmentsChange: 12.5, // Mock data for now
-      revenueChange: 8.3 // Mock data for now
+      appointmentsChange: parseFloat(appointmentsChange),
+      revenueChange: parseFloat(revenueChange),
+      doctorsChange: parseFloat(doctorsChange)
     };
 
     console.log('Dashboard stats calculated:', stats);
@@ -421,48 +489,7 @@ app.get('/api/dashboard', async (req, res) => {
 });
 
 // Payments endpoint - serving real Neon PostgreSQL data
-app.get('/api/payments', async (req, res) => {
-  try {
-    console.log('API call to /api/payments');
-    
-    const payments = await prisma.payment.findMany({
-      include: {
-        appointment: {
-          include: {
-            doctor: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    console.log(`Found ${payments.length} payments in database`);
-
-    // Transform database payments to frontend format
-    const transformedPayments = payments.map((payment) => ({
-      id: payment.id,
-      appointmentId: payment.appointment?.id || 'N/A',
-      transactionId: payment.transactionId || `TXN-${payment.id.slice(0, 8)}`,
-      method: payment.method.toLowerCase(),
-      amount: payment.amount,
-      status: payment.status.toLowerCase(),
-      date: payment.createdAt.toISOString(),
-      doctorName: payment.appointment?.doctor?.name || 'Unknown',
-      patientName: payment.appointment?.patientName || 'Unknown'
-    }));
-
-    res.json(transformedPayments);
-  } catch (error) {
-    console.error('Database error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch payments from database',
-      error: error.message,
-    });
-  }
-});
+// REMOVED: Duplicate payments endpoint - using the one at line 1776 instead which includes more fields and proper response format
 
 // Authentication endpoints
 app.post('/api/auth/login', async (req, res) => {
@@ -684,11 +711,15 @@ app.get('/api/appointments/unpaid', async (req, res) => {
       patientName: appointment.patientName,
       patientEmail: appointment.patientEmail,
       patientPhone: appointment.patientPhone,
+      patientNIC: appointment.patientNIC,
       date: appointment.date.toISOString().split('T')[0],
       time: appointment.timeSlot,
       status: appointment.status.toLowerCase(),
       amount: appointment.amount,
       paymentStatus: appointment.payment ? appointment.payment.status.toLowerCase() : 'pending',
+      paymentMethod: appointment.paymentMethod,
+      sltPhoneNumber: appointment.sltPhoneNumber,
+      employeeNIC: appointment.employeeNIC,
       notes: appointment.notes || '',
       createdAt: appointment.createdAt
     }));
@@ -707,7 +738,19 @@ app.get('/api/appointments/unpaid', async (req, res) => {
 app.post('/api/appointments', optionalAuth, async (req, res) => {
   try {
     console.log('Creating new appointment:', req.body);
-    const { doctorId, patientName, patientEmail, patientPhone, date, timeSlot, amount, paymentMethod } = req.body;
+    const { 
+      doctorId, 
+      patientName, 
+      patientNIC,
+      patientEmail, 
+      patientPhone, 
+      date, 
+      timeSlot, 
+      amount, 
+      paymentMethod,
+      sltPhoneNumber,
+      employeeNIC
+    } = req.body;
     
     // Agent is already attached to req by optionalAuth middleware
     const agent = req.agent;
@@ -718,18 +761,37 @@ app.post('/api/appointments', optionalAuth, async (req, res) => {
         message: 'Authentication required'
       });
     }
+
+    // Validate required fields
+    if (!patientNIC) {
+      return res.status(400).json({
+        success: false,
+        message: 'Patient NIC is required'
+      });
+    }
+
+    if (paymentMethod === 'BILL_TO_PHONE' && !sltPhoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'SLT phone number is required for Bill to Phone payment'
+      });
+    }
     
     const appointment = await prisma.appointment.create({
       data: {
         agentId: agent.id,
         doctorId,
         patientName,
+        patientNIC,
         patientEmail,
         patientPhone,
+        sltPhoneNumber: paymentMethod === 'BILL_TO_PHONE' ? sltPhoneNumber : null,
+        employeeNIC: paymentMethod === 'DEDUCT_FROM_SALARY' ? employeeNIC : null,
         date: new Date(date),
         timeSlot,
         amount: parseFloat(amount),
-        status: 'PENDING'
+        status: 'PENDING',
+        paymentMethod: paymentMethod || 'BILL_TO_PHONE'
       },
       include: {
         doctor: true
@@ -840,11 +902,15 @@ app.post('/api/appointments/bulk', optionalAuth, async (req, res) => {
             agentId: agent.id,
             doctorId: doctor.id,
             patientName: appt.patientName,
+            patientNIC: appt.patientNIC,
             patientEmail: appt.patientEmail,
             patientPhone: appt.patientPhone,
             date: new Date(appt.date),
             timeSlot: appt.time,
             amount: doctor.consultationFee,
+            paymentMethod: appt.paymentMethod || 'BILL_TO_PHONE',
+            sltPhoneNumber: appt.sltPhoneNumber,
+            employeeNIC: appt.employeeNIC,
             status: 'PENDING'
           },
           include: { doctor: true }
@@ -907,7 +973,10 @@ app.post('/api/appointments/bulk', optionalAuth, async (req, res) => {
     res.json({
       success: true,
       message: `${createdAppointments.length} appointments created successfully`,
-      data: createdAppointments,
+      data: {
+        created: createdAppointments,
+        failed: []
+      },
       emailNotifications: {
         sent: emailsSent,
         total: createdAppointments.length
@@ -944,13 +1013,29 @@ app.post('/api/appointments/:id/confirm', async (req, res) => {
       });
     }
 
-    // Update appointment status
+    // Create payment record for this appointment
+    const payment = await prisma.payment.create({
+      data: {
+        amount: existingAppointment.amount,
+        status: 'PAID',
+        method: existingAppointment.paymentMethod || 'CARD', // Use paymentMethod from appointment
+        transactionId: `TXN-${Date.now()}-${id.slice(0, 8)}`,
+        agentId: existingAppointment.agentId,
+        processedAt: new Date()
+      }
+    });
+
+    // Update appointment status and link to payment
     const appointment = await prisma.appointment.update({
       where: { id },
-      data: { status: 'CONFIRMED' },
+      data: { 
+        status: 'CONFIRMED',
+        paymentId: payment.id
+      },
       include: { 
         doctor: true,
-        agent: true 
+        agent: true,
+        payment: true
       }
     });
 
@@ -1550,7 +1635,7 @@ app.post('/api/reports/generate', optionalAuth, async (req, res) => {
       'revenue': 'REVENUE',
       'doctors': 'DOCTOR_PERFORMANCE'
     };
-    const dbType = typeMapping[reportType] || reportType.toUpperCase();
+    const dbType = typeMapping[reportType] || (reportType ? reportType.toUpperCase() : 'APPOINTMENTS');
     
     const report = await prisma.report.create({
       data: {
