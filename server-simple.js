@@ -1148,11 +1148,20 @@ app.get('/api/profile', optionalAuth, async (req, res) => {
       });
     }
 
-    console.log('[PROFILE] Returning agent:', agent.name, '(ID:', agent.id.substring(0, 8) + '...)');
+    // Fetch agent with user data to get login email
+    const agentWithUser = await prisma.agent.findUnique({
+      where: { id: agent.id },
+      include: { user: true }
+    });
+
+    console.log('[PROFILE] Returning agent:', agentWithUser.name, '(ID:', agentWithUser.id.substring(0, 8) + '...)');
 
     res.json({
       success: true,
-      data: agent
+      data: {
+        ...agentWithUser,
+        loginEmail: agentWithUser.user.email // Include login email for frontend
+      }
     });
   } catch (error) {
     console.error('[ERROR] Profile fetch error:', error);
@@ -1177,6 +1186,31 @@ app.put('/api/profile', optionalAuth, async (req, res) => {
       });
     }
 
+    // If email is being updated, also update the user's login email
+    if (req.body.email && req.body.email !== agent.email) {
+      console.log('[PROFILE] Email change detected:', agent.email, '->', req.body.email);
+      
+      // Check if the new email is already taken by another user
+      const existingUser = await prisma.user.findUnique({
+        where: { email: req.body.email }
+      });
+
+      if (existingUser && existingUser.id !== agent.userId) {
+        return res.status(400).json({
+          success: false,
+          message: 'This email is already in use by another account'
+        });
+      }
+
+      // Update both User email (for login) and Agent email (for contact)
+      await prisma.user.update({
+        where: { id: agent.userId },
+        data: { email: req.body.email }
+      });
+
+      console.log('[PROFILE] Updated user login email to:', req.body.email);
+    }
+
     const updatedAgent = await prisma.agent.update({
       where: { id: agent.id },
       data: req.body,
@@ -1188,7 +1222,10 @@ app.put('/api/profile', optionalAuth, async (req, res) => {
     res.json({
       success: true,
       message: 'Profile updated successfully',
-      data: updatedAgent
+      data: {
+        ...updatedAgent,
+        loginEmail: updatedAgent.user.email // Include the updated login email
+      }
     });
   } catch (error) {
     console.error('[ERROR] Profile update error:', error);
