@@ -12,6 +12,7 @@ interface AppointmentEmailData {
   time: string;
   appointmentId: string;
   amount: number;
+  paymentMethod?: string;
   corporateAgent: {
     companyName: string;
     email: string;
@@ -249,8 +250,13 @@ class EmailService {
                     </div>
                     
                     <div class="info-row" style="border-bottom: none;">
-                        <span class="label">Payment:</span>
-                        <span class="highlight">Covered by ${corporateAgent.companyName}</span>
+                        <span class="label">Payment Method:</span>
+                        <span class="highlight">${data.paymentMethod === 'BILL_TO_PHONE' ? '📞 Bill to Phone (SLT)' : '💼 Deduct from Salary'}</span>
+                    </div>
+                    
+                    <div class="info-row" style="border-bottom: none;">
+                        <span class="label">Billed To:</span>
+                        <span class="value">${corporateAgent.companyName}</span>
                     </div>
                 </div>
                 
@@ -307,7 +313,8 @@ Date: ${date}
 Time: ${time}
 Appointment ID: ${appointmentId}
 Consultation Fee: Rs. ${amount.toLocaleString()}
-Payment: Covered by ${corporateAgent.companyName}
+Payment Method: ${data.paymentMethod === 'BILL_TO_PHONE' ? 'Bill to Phone (SLT)' : 'Deduct from Salary'}
+Billed To: ${corporateAgent.companyName}
 
 IMPORTANT INSTRUCTIONS:
 • Please arrive 15 minutes early for registration
@@ -415,8 +422,13 @@ Powered by ${corporateAgent.companyName}
                     </div>
                     
                     <div class="info-row" style="border-bottom: none;">
-                        <span class="label">Payment Status:</span>
-                        <span class="highlight">Covered by ${corporateAgent.companyName}</span>
+                        <span class="label">Payment Method:</span>
+                        <span class="highlight">${data.paymentMethod === 'BILL_TO_PHONE' ? '📞 Bill to Phone (SLT)' : '💼 Deduct from Salary'}</span>
+                    </div>
+                    
+                    <div class="info-row" style="border-bottom: none;">
+                        <span class="label">Billed To:</span>
+                        <span class="value">${corporateAgent.companyName}</span>
                     </div>
                 </div>
                 
@@ -473,7 +485,8 @@ Date: ${date}
 Time: ${time}
 Appointment ID: ${appointmentId}
 Consultation Fee: Rs. ${amount.toLocaleString()}
-Payment: Covered by ${corporateAgent.companyName}
+Payment Method: ${data.paymentMethod === 'BILL_TO_PHONE' ? 'Bill to Phone (SLT)' : 'Deduct from Salary'}
+Billed To: ${corporateAgent.companyName}
 
 IMPORTANT REMINDERS:
 • Please arrive 15 minutes early for registration
@@ -579,6 +592,16 @@ Powered by ${corporateAgent.companyName}
                         <span class="value"><strong>Rs. ${amount.toLocaleString()}</strong></span>
                     </div>
                     
+                    <div class="info-row">
+                        <span class="label">Payment Method:</span>
+                        <span class="value"><strong>${data.paymentMethod === 'BILL_TO_PHONE' ? '📞 Bill to Phone (SLT)' : '💼 Deduct from Salary'}</strong></span>
+                    </div>
+                    
+                    <div class="info-row">
+                        <span class="label">Billed To:</span>
+                        <span class="value">${corporateAgent.companyName}</span>
+                    </div>
+                    
                     <div class="info-row" style="border-bottom: none;">
                         <span class="label">Status:</span>
                         <span class="pending-tag">PENDING CONFIRMATION</span>
@@ -638,6 +661,8 @@ Requested Date: ${date}
 Requested Time: ${time}
 Appointment ID: ${appointmentId}
 Consultation Fee: Rs. ${amount.toLocaleString()}
+Payment Method: ${data.paymentMethod === 'BILL_TO_PHONE' ? 'Bill to Phone (SLT)' : 'Deduct from Salary'}
+Billed To: ${corporateAgent.companyName}
 Status: PENDING CONFIRMATION
 
 WHAT HAPPENS NEXT:

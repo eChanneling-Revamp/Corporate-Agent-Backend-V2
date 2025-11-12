@@ -578,6 +578,10 @@ app.post('/api/auth/login', async (req, res) => {
           name: user.agent.name,
           companyName: user.agent.companyName,
           email: user.agent.email,
+          phone: user.agent.phone,
+          address: user.agent.address,
+          createdAt: user.agent.createdAt,
+          loginEmail: user.email, // Include login email
         } : null,
         tokens: {
           accessToken,
@@ -818,6 +822,7 @@ app.post('/api/appointments', optionalAuth, async (req, res) => {
         time: appointment.timeSlot,
         appointmentId: appointment.id,
         amount: appointment.amount,
+        paymentMethod: appointment.paymentMethod,
         corporateAgent: {
           companyName: agent.companyName || 'ABC Insurance Company',
           email: agent.email || 'corporateagent@slt.lk'
@@ -933,6 +938,7 @@ app.post('/api/appointments/bulk', optionalAuth, async (req, res) => {
             time: appointment.timeSlot,
             appointmentId: appointment.id,
             amount: appointment.amount,
+            paymentMethod: appointment.paymentMethod,
             corporateAgent: {
               companyName: agent.companyName || 'ABC Insurance Company',
               email: agent.email || 'corporateagent@slt.lk'
@@ -1052,6 +1058,7 @@ app.post('/api/appointments/:id/confirm', async (req, res) => {
         time: appointment.timeSlot,
         appointmentId: appointment.id,
         amount: appointment.amount,
+        paymentMethod: appointment.paymentMethod,
         corporateAgent: {
           companyName: appointment.agent?.companyName || 'ABC Insurance Company',
           email: appointment.agent?.email || 'corporateagent@slt.lk'
