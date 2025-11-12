@@ -61,21 +61,25 @@ model Doctor {
 }
 
 model Appointment {
-  id           String            @id @default(uuid())
-  agentId      String
-  doctorId     String
-  patientName  String
-  patientEmail String
-  patientPhone String
-  date         DateTime
-  timeSlot     String
-  status       AppointmentStatus @default(PENDING)
-  amount       Float
-  notes        String?
-  cancelReason String?
-  paymentId    String?           @unique
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  id                 String            @id @default(uuid())
+  agentId            String
+  doctorId           String
+  patientName        String
+  patientNIC         String?
+  patientEmail       String
+  patientPhone       String
+  date               DateTime
+  timeSlot           String
+  status             AppointmentStatus @default(PENDING)
+  amount             Float
+  paymentMethod      PaymentMethod     @default(BILL_TO_PHONE)
+  sltPhoneNumber     String?
+  employeeNIC        String?
+  notes              String?
+  cancelReason       String?
+  paymentId          String?           @unique
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
   agent        Agent             @relation(fields: [agentId], references: [id], onDelete: Cascade)
   doctor       Doctor            @relation(fields: [doctorId], references: [id])
   payment      Payment?          @relation(fields: [paymentId], references: [id])
@@ -87,7 +91,7 @@ model Payment {
   id            String        @id @default(uuid())
   amount        Float
   status        PaymentStatus @default(PENDING)
-  method        PaymentMethod @default(CARD)
+  method        PaymentMethod @default(BILL_TO_PHONE)
   transactionId String?       @unique
   agentId       String?
   notes         String?
@@ -201,10 +205,8 @@ enum PaymentStatus {
 }
 
 enum PaymentMethod {
-  CARD
-  BANK_TRANSFER
-  CASH
-  WALLET
+  BILL_TO_PHONE
+  DEDUCT_FROM_SALARY
 }
 
 enum ReportType {

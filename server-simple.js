@@ -350,11 +350,15 @@ app.get('/api/appointments', async (req, res) => {
       patientName: appointment.patientName,
       patientEmail: appointment.patientEmail,
       patientPhone: appointment.patientPhone,
+      patientNIC: appointment.patientNIC,
       date: appointment.date.toISOString().split('T')[0], // Format as YYYY-MM-DD
       time: appointment.timeSlot,
       status: appointment.status.toLowerCase(),
       amount: appointment.amount,
       paymentStatus: appointment.payment ? appointment.payment.status.toLowerCase() : 'pending',
+      paymentMethod: appointment.paymentMethod, // Include payment method
+      sltPhoneNumber: appointment.sltPhoneNumber,
+      employeeNIC: appointment.employeeNIC,
       notes: appointment.notes || '',
       createdAt: appointment.createdAt
     }));
@@ -396,6 +400,69 @@ app.get('/api/dashboard', async (req, res) => {
       where: { isActive: true }
     });
 
+    // Calculate growth percentages based on time periods
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+    // Appointments growth (last 30 days vs previous 30 days)
+    const [appointmentsLast30Days, appointmentsPrevious30Days] = await Promise.all([
+      prisma.appointment.count({
+        where: { createdAt: { gte: thirtyDaysAgo } }
+      }),
+      prisma.appointment.count({
+        where: { 
+          createdAt: { 
+            gte: sixtyDaysAgo,
+            lt: thirtyDaysAgo 
+          } 
+        }
+      })
+    ]);
+
+    const appointmentsChange = appointmentsPrevious30Days > 0 
+      ? ((appointmentsLast30Days - appointmentsPrevious30Days) / appointmentsPrevious30Days * 100).toFixed(1)
+      : (appointmentsLast30Days > 0 ? 100 : 0);
+
+    // Revenue growth (last 30 days vs previous 30 days)
+    const [revenueLast30Days, revenuePrevious30Days] = await Promise.all([
+      prisma.appointment.aggregate({
+        where: { 
+          status: 'CONFIRMED',
+          createdAt: { gte: thirtyDaysAgo }
+        },
+        _sum: { amount: true }
+      }),
+      prisma.appointment.aggregate({
+        where: { 
+          status: 'CONFIRMED',
+          createdAt: { 
+            gte: sixtyDaysAgo,
+            lt: thirtyDaysAgo 
+          }
+        },
+        _sum: { amount: true }
+      })
+    ]);
+
+    const revenueLastMonth = revenueLast30Days._sum.amount || 0;
+    const revenuePreviousMonth = revenuePrevious30Days._sum.amount || 0;
+    const revenueChange = revenuePreviousMonth > 0
+      ? ((revenueLastMonth - revenuePreviousMonth) / revenuePreviousMonth * 100).toFixed(1)
+      : (revenueLastMonth > 0 ? 100 : 0);
+
+    // Doctor growth (doctors added in last 30 days)
+    const doctorsAddedLast30Days = await prisma.doctor.count({
+      where: { 
+        isActive: true,
+        createdAt: { gte: thirtyDaysAgo }
+      }
+    });
+    
+    const doctorsChange = activeDoctors > 0
+      ? ((doctorsAddedLast30Days / activeDoctors) * 100).toFixed(1)
+      : 0;
+
     const stats = {
       totalAppointments,
       pendingConfirmations,
@@ -403,8 +470,9 @@ app.get('/api/dashboard', async (req, res) => {
       cancelledAppointments,
       revenue: revenueData._sum.amount || 0,
       activeDoctors,
-      appointmentsChange: 12.5, // Mock data for now
-      revenueChange: 8.3 // Mock data for now
+      appointmentsChange: parseFloat(appointmentsChange),
+      revenueChange: parseFloat(revenueChange),
+      doctorsChange: parseFloat(doctorsChange)
     };
 
     console.log('Dashboard stats calculated:', stats);
@@ -421,48 +489,7 @@ app.get('/api/dashboard', async (req, res) => {
 });
 
 // Payments endpoint - serving real Neon PostgreSQL data
-app.get('/api/payments', async (req, res) => {
-  try {
-    console.log('API call to /api/payments');
-    
-    const payments = await prisma.payment.findMany({
-      include: {
-        appointment: {
-          include: {
-            doctor: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    console.log(`Found ${payments.length} payments in database`);
-
-    // Transform database payments to frontend format
-    const transformedPayments = payments.map((payment) => ({
-      id: payment.id,
-      appointmentId: payment.appointment?.id || 'N/A',
-      transactionId: payment.transactionId || `TXN-${payment.id.slice(0, 8)}`,
-      method: payment.method.toLowerCase(),
-      amount: payment.amount,
-      status: payment.status.toLowerCase(),
-      date: payment.createdAt.toISOString(),
-      doctorName: payment.appointment?.doctor?.name || 'Unknown',
-      patientName: payment.appointment?.patientName || 'Unknown'
-    }));
-
-    res.json(transformedPayments);
-  } catch (error) {
-    console.error('Database error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch payments from database',
-      error: error.message,
-    });
-  }
-});
+// REMOVED: Duplicate payments endpoint - using the one at line 1776 instead which includes more fields and proper response format
 
 // Authentication endpoints
 app.post('/api/auth/login', async (req, res) => {
@@ -551,6 +578,10 @@ app.post('/api/auth/login', async (req, res) => {
           name: user.agent.name,
           companyName: user.agent.companyName,
           email: user.agent.email,
+          phone: user.agent.phone,
+          address: user.agent.address,
+          createdAt: user.agent.createdAt,
+          loginEmail: user.email, // Include login email
         } : null,
         tokens: {
           accessToken,
@@ -684,11 +715,15 @@ app.get('/api/appointments/unpaid', async (req, res) => {
       patientName: appointment.patientName,
       patientEmail: appointment.patientEmail,
       patientPhone: appointment.patientPhone,
+      patientNIC: appointment.patientNIC,
       date: appointment.date.toISOString().split('T')[0],
       time: appointment.timeSlot,
       status: appointment.status.toLowerCase(),
       amount: appointment.amount,
       paymentStatus: appointment.payment ? appointment.payment.status.toLowerCase() : 'pending',
+      paymentMethod: appointment.paymentMethod,
+      sltPhoneNumber: appointment.sltPhoneNumber,
+      employeeNIC: appointment.employeeNIC,
       notes: appointment.notes || '',
       createdAt: appointment.createdAt
     }));
@@ -707,7 +742,19 @@ app.get('/api/appointments/unpaid', async (req, res) => {
 app.post('/api/appointments', optionalAuth, async (req, res) => {
   try {
     console.log('Creating new appointment:', req.body);
-    const { doctorId, patientName, patientEmail, patientPhone, date, timeSlot, amount, paymentMethod } = req.body;
+    const { 
+      doctorId, 
+      patientName, 
+      patientNIC,
+      patientEmail, 
+      patientPhone, 
+      date, 
+      timeSlot, 
+      amount, 
+      paymentMethod,
+      sltPhoneNumber,
+      employeeNIC
+    } = req.body;
     
     // Agent is already attached to req by optionalAuth middleware
     const agent = req.agent;
@@ -718,18 +765,37 @@ app.post('/api/appointments', optionalAuth, async (req, res) => {
         message: 'Authentication required'
       });
     }
+
+    // Validate required fields
+    if (!patientNIC) {
+      return res.status(400).json({
+        success: false,
+        message: 'Patient NIC is required'
+      });
+    }
+
+    if (paymentMethod === 'BILL_TO_PHONE' && !sltPhoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'SLT phone number is required for Bill to Phone payment'
+      });
+    }
     
     const appointment = await prisma.appointment.create({
       data: {
         agentId: agent.id,
         doctorId,
         patientName,
+        patientNIC,
         patientEmail,
         patientPhone,
+        sltPhoneNumber: paymentMethod === 'BILL_TO_PHONE' ? sltPhoneNumber : null,
+        employeeNIC: paymentMethod === 'DEDUCT_FROM_SALARY' ? employeeNIC : null,
         date: new Date(date),
         timeSlot,
         amount: parseFloat(amount),
-        status: 'PENDING'
+        status: 'PENDING',
+        paymentMethod: paymentMethod || 'BILL_TO_PHONE'
       },
       include: {
         doctor: true
@@ -756,6 +822,7 @@ app.post('/api/appointments', optionalAuth, async (req, res) => {
         time: appointment.timeSlot,
         appointmentId: appointment.id,
         amount: appointment.amount,
+        paymentMethod: appointment.paymentMethod,
         corporateAgent: {
           companyName: agent.companyName || 'ABC Insurance Company',
           email: agent.email || 'corporateagent@slt.lk'
@@ -840,11 +907,15 @@ app.post('/api/appointments/bulk', optionalAuth, async (req, res) => {
             agentId: agent.id,
             doctorId: doctor.id,
             patientName: appt.patientName,
+            patientNIC: appt.patientNIC,
             patientEmail: appt.patientEmail,
             patientPhone: appt.patientPhone,
             date: new Date(appt.date),
             timeSlot: appt.time,
             amount: doctor.consultationFee,
+            paymentMethod: appt.paymentMethod || 'BILL_TO_PHONE',
+            sltPhoneNumber: appt.sltPhoneNumber,
+            employeeNIC: appt.employeeNIC,
             status: 'PENDING'
           },
           include: { doctor: true }
@@ -867,6 +938,7 @@ app.post('/api/appointments/bulk', optionalAuth, async (req, res) => {
             time: appointment.timeSlot,
             appointmentId: appointment.id,
             amount: appointment.amount,
+            paymentMethod: appointment.paymentMethod,
             corporateAgent: {
               companyName: agent.companyName || 'ABC Insurance Company',
               email: agent.email || 'corporateagent@slt.lk'
@@ -907,7 +979,10 @@ app.post('/api/appointments/bulk', optionalAuth, async (req, res) => {
     res.json({
       success: true,
       message: `${createdAppointments.length} appointments created successfully`,
-      data: createdAppointments,
+      data: {
+        created: createdAppointments,
+        failed: []
+      },
       emailNotifications: {
         sent: emailsSent,
         total: createdAppointments.length
@@ -944,13 +1019,29 @@ app.post('/api/appointments/:id/confirm', async (req, res) => {
       });
     }
 
-    // Update appointment status
+    // Create payment record for this appointment
+    const payment = await prisma.payment.create({
+      data: {
+        amount: existingAppointment.amount,
+        status: 'PAID',
+        method: existingAppointment.paymentMethod || 'CARD', // Use paymentMethod from appointment
+        transactionId: `TXN-${Date.now()}-${id.slice(0, 8)}`,
+        agentId: existingAppointment.agentId,
+        processedAt: new Date()
+      }
+    });
+
+    // Update appointment status and link to payment
     const appointment = await prisma.appointment.update({
       where: { id },
-      data: { status: 'CONFIRMED' },
+      data: { 
+        status: 'CONFIRMED',
+        paymentId: payment.id
+      },
       include: { 
         doctor: true,
-        agent: true 
+        agent: true,
+        payment: true
       }
     });
 
@@ -967,6 +1058,7 @@ app.post('/api/appointments/:id/confirm', async (req, res) => {
         time: appointment.timeSlot,
         appointmentId: appointment.id,
         amount: appointment.amount,
+        paymentMethod: appointment.paymentMethod,
         corporateAgent: {
           companyName: appointment.agent?.companyName || 'ABC Insurance Company',
           email: appointment.agent?.email || 'corporateagent@slt.lk'
@@ -1333,6 +1425,536 @@ app.patch('/api/notifications/read-all', optionalAuth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to mark all notifications as read',
+      error: error.message,
+    });
+  }
+});
+
+// ==================== REPORTS ENDPOINTS ====================
+
+// GET all reports for agent
+app.get('/api/reports', optionalAuth, async (req, res) => {
+  try {
+    const agent = req.agent;
+
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Agent not found'
+      });
+    }
+
+    const reports = await prisma.report.findMany({
+      where: { agentId: agent.id },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    console.log(`[REPORTS] Found ${reports.length} reports for agent ${agent.id}`);
+
+    res.json({
+      success: true,
+      data: reports
+    });
+  } catch (error) {
+    console.error('[ERROR] Failed to fetch reports:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch reports',
+      error: error.message,
+    });
+  }
+});
+
+// POST - Generate a new report
+app.post('/api/reports/generate', optionalAuth, async (req, res) => {
+  try {
+    const agent = req.agent;
+
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Agent not found'
+      });
+    }
+
+    const { reportType, dateFrom, dateTo, filters } = req.body;
+
+    console.log('[REPORTS] Generating report:', { reportType, dateFrom, dateTo, agentId: agent.id });
+
+    // Build date range - Use UTC to avoid timezone issues
+    // Input dates are in YYYY-MM-DD format, appointments are stored at UTC midnight
+    const dateFilter = {};
+    if (dateFrom) {
+      // Parse as UTC date at start of day
+      const fromDate = new Date(dateFrom + 'T00:00:00.000Z');
+      dateFilter.gte = fromDate;
+      console.log('[REPORTS] Date from (UTC):', fromDate.toISOString());
+    }
+    if (dateTo) {
+      // Parse as UTC date at end of day
+      const toDate = new Date(dateTo + 'T23:59:59.999Z');
+      dateFilter.lte = toDate;
+      console.log('[REPORTS] Date to (UTC):', toDate.toISOString());
+    }
+
+    // Fetch appointments for the date range
+    const appointments = await prisma.appointment.findMany({
+      where: {
+        agentId: agent.id,
+        date: Object.keys(dateFilter).length > 0 ? dateFilter : undefined,
+      },
+      include: {
+        doctor: true,
+        payment: true
+      },
+      orderBy: { date: 'desc' }
+    });
+
+    console.log(`[REPORTS] Found ${appointments.length} appointments for agent ${agent.id} (${agent.name})`);
+    console.log('[REPORTS] Agent email:', agent.email);
+    console.log('[REPORTS] Date filter applied:', dateFilter);
+    if (appointments.length > 0) {
+      console.log('[REPORTS] First appointment date:', appointments[0].date);
+      console.log('[REPORTS] Last appointment date:', appointments[appointments.length - 1].date);
+      console.log('[REPORTS] Sample statuses:', appointments.slice(0, 5).map(a => ({ status: a.status, date: a.date, amount: a.amount, patient: a.patientName })));
+    } else {
+      // Debug: Let's check if there are ANY appointments for this agent
+      const totalForAgent = await prisma.appointment.count({ where: { agentId: agent.id } });
+      console.log('[REPORTS] DEBUG: Total appointments for this agent (no date filter):', totalForAgent);
+      
+      // Check a few recent appointments to see their dates
+      const recentApts = await prisma.appointment.findMany({
+        where: { agentId: agent.id },
+        take: 5,
+        orderBy: { date: 'desc' },
+        select: { date: true, patientName: true, status: true }
+      });
+      console.log('[REPORTS] DEBUG: Recent appointments:', recentApts);
+    }
+
+    let reportData = {};
+    let title = '';
+
+    switch (reportType) {
+      case 'appointments':
+        reportData = {
+          totalAppointments: appointments.length,
+          confirmed: appointments.filter(a => a.status === 'CONFIRMED').length,
+          pending: appointments.filter(a => a.status === 'PENDING').length,
+          cancelled: appointments.filter(a => a.status === 'CANCELLED').length,
+          completed: appointments.filter(a => a.status === 'COMPLETED').length,
+          appointments: appointments.map(a => ({
+            id: a.id,
+            patientName: a.patientName,
+            doctorName: a.doctor.name,
+            hospital: a.doctor.hospital,
+            date: a.date,
+            status: a.status,
+            amount: a.amount
+          }))
+        };
+        title = `Appointments Report (${new Date(dateFrom).toLocaleDateString()} - ${new Date(dateTo).toLocaleDateString()})`;
+        break;
+
+      case 'revenue':
+        // Revenue is calculated from CONFIRMED appointments (as per dashboard logic)
+        const confirmedAppointments = appointments.filter(a => a.status === 'CONFIRMED');
+        const totalRevenue = confirmedAppointments.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
+        
+        // Pending appointments that are not yet confirmed
+        const pendingAppointments = appointments.filter(a => a.status === 'PENDING');
+        const pendingRevenue = pendingAppointments.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
+        
+        // Cancelled/other appointments
+        const otherAppointments = appointments.filter(a => a.status !== 'CONFIRMED' && a.status !== 'PENDING');
+
+        reportData = {
+          totalRevenue,
+          pendingRevenue,
+          paidCount: confirmedAppointments.length,
+          pendingCount: pendingAppointments.length,
+          averagePerAppointment: confirmedAppointments.length > 0 ? totalRevenue / confirmedAppointments.length : 0,
+          revenueByMonth: {},
+          payments: confirmedAppointments.map(a => ({
+            date: a.date,
+            amount: a.amount,
+            patient: a.patientName,
+            doctor: a.doctor?.name || 'Unknown',
+            transactionId: a.payment?.transactionId || 'N/A',
+            status: a.status
+          }))
+        };
+        title = `Revenue Report (${new Date(dateFrom).toLocaleDateString()} - ${new Date(dateTo).toLocaleDateString()})`;
+        break;
+
+      case 'doctors':
+        const doctorStats = {};
+        appointments.forEach(apt => {
+          if (!apt.doctor) {
+            console.log('[REPORTS] Skipping appointment without doctor:', apt.id);
+            return; // Skip if no doctor
+          }
+          
+          const docName = apt.doctor.name;
+          if (!doctorStats[docName]) {
+            doctorStats[docName] = {
+              name: docName,
+              hospital: apt.doctor.hospital || 'Unknown',
+              specialty: apt.doctor.specialty || 'General',
+              totalAppointments: 0,
+              confirmed: 0,
+              cancelled: 0,
+              totalRevenue: 0
+            };
+          }
+          doctorStats[docName].totalAppointments++;
+          if (apt.status === 'CONFIRMED') {
+            doctorStats[docName].confirmed++;
+            // Revenue is from CONFIRMED appointments
+            doctorStats[docName].totalRevenue += (Number(apt.amount) || 0);
+          }
+          if (apt.status === 'CANCELLED') doctorStats[docName].cancelled++;
+        });
+
+        const doctorsArray = Object.values(doctorStats);
+        console.log(`[REPORTS] Processed ${doctorsArray.length} doctors with data:`, doctorsArray.map(d => ({ name: d.name, revenue: d.totalRevenue })));
+        
+        reportData = {
+          totalDoctors: doctorsArray.length,
+          doctors: doctorsArray,
+          topPerformers: doctorsArray.sort((a, b) => b.totalRevenue - a.totalRevenue).slice(0, 10)
+        };
+        title = `Doctor Performance Report (${new Date(dateFrom).toLocaleDateString()} - ${new Date(dateTo).toLocaleDateString()})`;
+        break;
+
+      default:
+        reportData = { appointments: appointments.length };
+        title = `Custom Report`;
+    }
+
+    // Save report to database
+    console.log('[REPORTS] Saving report with data keys:', Object.keys(reportData));
+    console.log('[REPORTS] Report data summary:', JSON.stringify(reportData).length, 'bytes');
+    
+    // Map frontend report types to database enum values
+    const typeMapping = {
+      'appointments': 'APPOINTMENTS',
+      'revenue': 'REVENUE',
+      'doctors': 'DOCTOR_PERFORMANCE'
+    };
+    const dbType = typeMapping[reportType] || (reportType ? reportType.toUpperCase() : 'APPOINTMENTS');
+    
+    const report = await prisma.report.create({
+      data: {
+        agentId: agent.id,
+        type: dbType,
+        title,
+        data: reportData, // Prisma handles JSON serialization automatically
+        parameters: {
+          dateFrom,
+          dateTo,
+          filters: filters || {}
+        }
+      }
+    });
+
+    console.log('[REPORTS] Report generated successfully:', report.id);
+
+    res.json({
+      success: true,
+      message: 'Report generated successfully',
+      data: report
+    });
+  } catch (error) {
+    console.error('[ERROR] Failed to generate report:', error);
+    console.error('[ERROR] Stack trace:', error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate report',
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// GET specific report by ID
+app.get('/api/reports/:id', optionalAuth, async (req, res) => {
+  try {
+    const agent = req.agent;
+    const { id } = req.params;
+
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Agent not found'
+      });
+    }
+
+    const report = await prisma.report.findFirst({
+      where: {
+        id,
+        agentId: agent.id
+      }
+    });
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: 'Report not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: report
+    });
+  } catch (error) {
+    console.error('[ERROR] Failed to fetch report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch report',
+      error: error.message,
+    });
+  }
+});
+
+// DELETE report
+app.delete('/api/reports/:id', optionalAuth, async (req, res) => {
+  try {
+    const agent = req.agent;
+    const { id } = req.params;
+
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Agent not found'
+      });
+    }
+
+    // Verify report belongs to agent
+    const report = await prisma.report.findFirst({
+      where: {
+        id,
+        agentId: agent.id
+      }
+    });
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: 'Report not found'
+      });
+    }
+
+    await prisma.report.delete({
+      where: { id }
+    });
+
+    console.log('[REPORTS] Report deleted:', id);
+
+    res.json({
+      success: true,
+      message: 'Report deleted successfully'
+    });
+  } catch (error) {
+    console.error('[ERROR] Failed to delete report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete report',
+      error: error.message,
+    });
+  }
+});
+
+// ==================== ENHANCED PAYMENTS ENDPOINTS ====================
+
+// GET payment statistics
+app.get('/api/payments/stats', optionalAuth, async (req, res) => {
+  try {
+    const agent = req.agent;
+
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Agent not found'
+      });
+    }
+
+    const payments = await prisma.payment.findMany({
+      where: { agentId: agent.id },
+      include: {
+        appointment: true
+      }
+    });
+
+    const stats = {
+      totalRevenue: payments.filter(p => p.status === 'PAID').reduce((sum, p) => sum + p.amount, 0),
+      pendingAmount: payments.filter(p => p.status === 'PENDING').reduce((sum, p) => sum + p.amount, 0),
+      totalPayments: payments.length,
+      paidCount: payments.filter(p => p.status === 'PAID').length,
+      pendingCount: payments.filter(p => p.status === 'PENDING').length,
+      failedCount: payments.filter(p => p.status === 'FAILED').length,
+      averagePayment: payments.length > 0 ? payments.reduce((sum, p) => sum + p.amount, 0) / payments.length : 0,
+      paymentMethods: {
+        card: payments.filter(p => p.method === 'CARD').length,
+        bankTransfer: payments.filter(p => p.method === 'BANK_TRANSFER').length,
+        cash: payments.filter(p => p.method === 'CASH').length,
+        wallet: payments.filter(p => p.method === 'WALLET').length
+      }
+    };
+
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('[ERROR] Failed to fetch payment stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch payment statistics',
+      error: error.message,
+    });
+  }
+});
+
+// GET payments with filtering
+app.get('/api/payments', optionalAuth, async (req, res) => {
+  try {
+    const agent = req.agent;
+    const { status, method, dateFrom, dateTo, search } = req.query;
+
+    // Build where clause
+    const whereClause = agent ? { agentId: agent.id } : {};
+
+    if (status) {
+      whereClause.status = status.toUpperCase();
+    }
+
+    if (method) {
+      whereClause.method = method.toUpperCase();
+    }
+
+    if (dateFrom || dateTo) {
+      whereClause.createdAt = {};
+      if (dateFrom) whereClause.createdAt.gte = new Date(dateFrom);
+      if (dateTo) whereClause.createdAt.lte = new Date(dateTo);
+    }
+
+    const payments = await prisma.payment.findMany({
+      where: whereClause,
+      include: {
+        appointment: {
+          include: {
+            doctor: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    console.log(`[PAYMENTS] Found ${payments.length} payments`);
+
+    // Transform database payments to frontend format
+    let transformedPayments = payments.map((payment) => ({
+      id: payment.id,
+      appointmentId: payment.appointment?.id || 'N/A',
+      transactionId: payment.transactionId || `TXN-${payment.id.slice(0, 8)}`,
+      method: payment.method.toLowerCase(),
+      amount: payment.amount,
+      status: payment.status.toLowerCase(),
+      date: payment.createdAt.toISOString(),
+      processedAt: payment.processedAt ? payment.processedAt.toISOString() : null,
+      doctorName: payment.appointment?.doctor?.name || 'Unknown',
+      patientName: payment.appointment?.patientName || 'Unknown',
+      patientEmail: payment.appointment?.patientEmail || '',
+      patientPhone: payment.appointment?.patientPhone || '',
+      hospital: payment.appointment?.doctor?.hospital || 'Unknown',
+      specialty: payment.appointment?.doctor?.specialty || 'Unknown',
+      notes: payment.notes
+    }));
+
+    // Apply search filter if provided
+    if (search) {
+      const searchLower = search.toLowerCase();
+      transformedPayments = transformedPayments.filter(p =>
+        p.transactionId.toLowerCase().includes(searchLower) ||
+        p.patientName.toLowerCase().includes(searchLower) ||
+        p.doctorName.toLowerCase().includes(searchLower) ||
+        p.id.toLowerCase().includes(searchLower)
+      );
+    }
+
+    res.json({
+      success: true,
+      data: transformedPayments,
+      total: transformedPayments.length
+    });
+  } catch (error) {
+    console.error('[ERROR] Database error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch payments from database',
+      error: error.message,
+    });
+  }
+});
+
+// GET specific payment by ID
+app.get('/api/payments/:id', optionalAuth, async (req, res) => {
+  try {
+    const agent = req.agent;
+    const { id } = req.params;
+
+    const whereClause = { id };
+    if (agent) {
+      whereClause.agentId = agent.id;
+    }
+
+    const payment = await prisma.payment.findFirst({
+      where: whereClause,
+      include: {
+        appointment: {
+          include: {
+            doctor: true
+          }
+        }
+      }
+    });
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Payment not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: payment.id,
+        appointmentId: payment.appointment?.id || 'N/A',
+        transactionId: payment.transactionId || `TXN-${payment.id.slice(0, 8)}`,
+        method: payment.method.toLowerCase(),
+        amount: payment.amount,
+        status: payment.status.toLowerCase(),
+        date: payment.createdAt.toISOString(),
+        processedAt: payment.processedAt ? payment.processedAt.toISOString() : null,
+        doctorName: payment.appointment?.doctor?.name || 'Unknown',
+        patientName: payment.appointment?.patientName || 'Unknown',
+        patientEmail: payment.appointment?.patientEmail || '',
+        patientPhone: payment.appointment?.patientPhone || '',
+        hospital: payment.appointment?.doctor?.hospital || 'Unknown',
+        specialty: payment.appointment?.doctor?.specialty || 'Unknown',
+        notes: payment.notes
+      }
+    });
+  } catch (error) {
+    console.error('[ERROR] Failed to fetch payment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch payment',
       error: error.message,
     });
   }
