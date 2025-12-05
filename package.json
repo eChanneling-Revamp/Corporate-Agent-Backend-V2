@@ -5,7 +5,7 @@
   "main": "server-simple.js",
   "scripts": {
     "start": "node server-simple.js",
-    "build": "npm run prisma:generate && tsc --skipLibCheck --noEmitOnError false",
+    "build": "npm run prisma:generate && tsc --skipLibCheck --noEmitOnError false && tsc-alias",
     "start:simple": "node server-simple.js",
     "start:full": "node dist/server.js",
     "dev": "nodemon src/server-simple.ts",
@@ -58,6 +58,7 @@
     "nodemon": "^3.0.1",
     "prisma": "^5.6.0",
     "ts-node": "^10.9.1",
+    "tsc-alias": "^1.8.16",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.20.6"
   },
