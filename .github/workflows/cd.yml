@@ -39,7 +39,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Run container for testing health check
       - name: Run container for testing
         run: |
           docker run -d \
@@ -47,27 +46,24 @@ jobs:
             -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
             -e JWT_ACCESS_SECRET="${{ secrets.JWT_ACCESS_SECRET }}" \
             -e JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}" \
-            -e NODE_ENV="${{ vars.NODE_ENV || 'production' }}" \
-            -e PORT="${{ vars.PORT || '3001' }}" \
-            -e WS_PORT="${{ vars.WS_PORT || '3002' }}" \
-            -e FRONTEND_URL="${{ vars.FRONTEND_URL || 'http://localhost:3000' }}" \
-            -e ALLOWED_ORIGINS="${{ vars.ALLOWED_ORIGINS || 'http://localhost:3000' }}" \
-            -p 3001:3001 \
+            -e NODE_ENV="${{ vars.NODE_ENV }}" \
+            -e PORT="${{ vars.PORT }}" \
+            -e WS_PORT="${{ vars.WS_PORT }}" \
+            -e FRONTEND_URL="${{ vars.FRONTEND_URL }}" \
+            -e ALLOWED_ORIGINS="${{ vars.ALLOWED_ORIGINS }}" \
+            -p ${{ vars.PORT }}:${{ vars.PORT }} \
             corporate-agent-backend:test
 
       - name: Wait for service to start
         run: |
           echo "Waiting for service to be ready..."
-          # Adjust port if vars.PORT is different
-          TARGET_PORT="${{ vars.PORT || '3001' }}"
-          timeout 30 bash -c "until curl -f http://localhost:$TARGET_PORT/api/v1/health 2>/dev/null; do sleep 2; done" || true
+          timeout 30 bash -c 'until curl -f http://localhost:${{ vars.PORT }}/api/v1/health 2>/dev/null; do sleep 2; done' || true
           sleep 5
 
       - name: Test health endpoint
         run: |
           echo "Testing health endpoint..."
-          TARGET_PORT="${{ vars.PORT || '3001' }}"
-          response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$TARGET_PORT/api/v1/health || echo "000")
+          response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${{ vars.PORT }}/api/v1/health || echo "000")
           echo "Health endpoint returned: $response"
           if [ "$response" -eq "200" ]; then
             echo "✅ Health check passed!"
@@ -116,7 +112,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GH_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata (tags, labels)
         id: meta
@@ -142,7 +138,7 @@ jobs:
           echo "✅ Docker image pushed to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
           echo "Tags: ${{ steps.meta.outputs.tags }}"
 
-  # Job 3: Deploy to Dev Server (uses podman on the remote server)
+  # Job 3: Deploy to Dev Server
   deploy-to-dev:
     name: Deploy to Dev Server
     runs-on: ubuntu-latest
@@ -158,7 +154,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Add the SSH private key so we can SSH to the server
       - name: Start ssh-agent and add key
         uses: webfactory/ssh-agent@v0.6.0
         with:
@@ -174,31 +169,19 @@ jobs:
           ssh -o StrictHostKeyChecking=yes -p ${{ secrets.DEV_SERVER_SSH_PORT }} ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }} << 'REMOTE_EOF'
           set -euo pipefail
 
-          # image to deploy (uses latest tag)
           IMAGE="ghcr.io/${{ env.IMAGE_NAME }}:latest"
           CONTAINER="corporate-agent-backend"
 
           echo "Pulling image: $IMAGE"
           podman pull "$IMAGE"
 
-          echo "Stopping and removing existing container (if any)"
-          # Force remove the container if it exists (handles stop and rm)
+          echo "Stopping existing container (if any)"
           podman rm -f "$CONTAINER" || true
 
-          # Wait for port cleanup to avoid 'Address already in use' errors
-          echo "Waiting 10s for port to be released..."
+          echo "Waiting 10 seconds for port cleanup..."
           sleep 10
 
           echo "Starting new container"
-          # Using environment variables from secrets/vars
-          # IMPORTANT: We use single quotes for variables inside the heredoc to prevent local expansion
-          # But we want to inject GitHub Secrets, causing a conflict if we just pass them blindly.
-          # The trick is that the SSH block is running on the RUNNER, so ${{ secrets... }} IS expanded before sending to SSH.
-          # So we can pass them as args or expand them in the HERE doc setup line (risky for logs).
-          # Better approach: Pass them as environment variables to the SSH command, or expand them in the podman run command string.
-          # The example provided uses direct expansion: -e DATABASE_URL='${{ secrets.DATABASE_URL }}'
-          # This works because the script is generated on the runner, then sent to the server.
-          
           podman run -d \
             --name "$CONTAINER" \
             --replace \
@@ -211,8 +194,8 @@ jobs:
             -e WS_PORT='${{ vars.WS_PORT }}' \
             -e FRONTEND_URL='${{ vars.FRONTEND_URL }}' \
             -e ALLOWED_ORIGINS='${{ vars.ALLOWED_ORIGINS }}' \
-            -p ${{ vars.PORT || '3001' }}:${{ vars.PORT || '3001' }} \
-            -p ${{ vars.WS_PORT || '3002' }}:${{ vars.WS_PORT || '3002' }} \
+            -p ${{ vars.PORT }}:${{ vars.PORT }} \
+            -p ${{ vars.WS_PORT }}:${{ vars.WS_PORT }} \
             "$IMAGE"
 
           echo "Container status:"
