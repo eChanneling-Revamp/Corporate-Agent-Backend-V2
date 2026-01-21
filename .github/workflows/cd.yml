@@ -191,10 +191,9 @@ jobs:
 
       - name: Deploy image on remote server using podman
         run: |
-          ssh -o StrictHostKeyChecking=yes -p ${{ secrets.DEV_SERVER_SSH_PORT }} ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }} << REMOTE_EOF
+          ssh -o StrictHostKeyChecking=yes -p ${{ secrets.DEV_SERVER_SSH_PORT }} ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }} "IMAGE=ghcr.io/${IMAGE_NAME}:latest bash -s" << 'REMOTE_EOF'
           set -euo pipefail
 
-          IMAGE="ghcr.io/$IMAGE_NAME:latest"
           CONTAINER="corporate-agent-backend"
 
           echo "Pulling image: $IMAGE"
