@@ -25,6 +25,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Load .env into environment
+        run: |
+          if [ -f .env ]; then
+            grep -v '^[[:space:]]*#' .env | sed '/^[[:space:]]*$/d' | while IFS= read -r line; do
+              echo "$line" >> $GITHUB_ENV
+            done
+          fi
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -46,24 +54,25 @@ jobs:
             -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
             -e JWT_ACCESS_SECRET="${{ secrets.JWT_ACCESS_SECRET }}" \
             -e JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}" \
-            -e NODE_ENV="${{ vars.NODE_ENV }}" \
-            -e PORT="${{ vars.PORT }}" \
-            -e WS_PORT="${{ vars.WS_PORT }}" \
-            -e FRONTEND_URL="${{ vars.FRONTEND_URL }}" \
-            -e ALLOWED_ORIGINS="${{ vars.ALLOWED_ORIGINS }}" \
-            -p ${{ vars.PORT }}:${{ vars.PORT }} \
+            -e NODE_ENV="$NODE_ENV" \
+            -e PORT="$PORT" \
+            -e WS_PORT="$WS_PORT" \
+            -e FRONTEND_URL="$FRONTEND_URL" \
+            -e ALLOWED_ORIGINS="$ALLOWED_ORIGINS" \
+            -p $PORT:$PORT \
+            -p $WS_PORT:$WS_PORT \
             corporate-agent-backend:test
 
       - name: Wait for service to start
         run: |
           echo "Waiting for service to be ready..."
-          timeout 30 bash -c 'until curl -f http://localhost:${{ vars.PORT }}/health 2>/dev/null; do sleep 2; done' || true
+          timeout 30 bash -c 'until curl -f http://localhost:$PORT/health 2>/dev/null; do sleep 2; done' || true
           sleep 5
 
       - name: Test health endpoint
         run: |
           echo "Testing health endpoint..."
-          response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${{ vars.PORT }}/health || echo "000")
+          response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$PORT/health || echo "000")
           echo "Health endpoint returned: $response"
           if [ "$response" -eq "200" ]; then
             echo "✅ Health check passed!"
@@ -101,6 +110,14 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Load .env into environment
+        run: |
+          if [ -f .env ]; then
+            grep -v '^[[:space:]]*#' .env | sed '/^[[:space:]]*$/d' | while IFS= read -r line; do
+              echo "$line" >> $GITHUB_ENV
+            done
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -154,6 +171,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Load .env into environment
+        run: |
+          if [ -f .env ]; then
+            grep -v '^[[:space:]]*#' .env | sed '/^[[:space:]]*$/d' | while IFS= read -r line; do
+              echo "$line" >> $GITHUB_ENV
+            done
+          fi
+
       - name: Start ssh-agent and add key
         uses: webfactory/ssh-agent@v0.6.0
         with:
@@ -166,10 +191,10 @@ jobs:
 
       - name: Deploy image on remote server using podman
         run: |
-          ssh -o StrictHostKeyChecking=yes -p ${{ secrets.DEV_SERVER_SSH_PORT }} ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }} << 'REMOTE_EOF'
+          ssh -o StrictHostKeyChecking=yes -p ${{ secrets.DEV_SERVER_SSH_PORT }} ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }} << REMOTE_EOF
           set -euo pipefail
 
-          IMAGE="ghcr.io/${{ env.IMAGE_NAME }}:latest"
+          IMAGE="ghcr.io/$IMAGE_NAME:latest"
           CONTAINER="corporate-agent-backend"
 
           echo "Pulling image: $IMAGE"
@@ -189,13 +214,13 @@ jobs:
             -e DATABASE_URL='${{ secrets.DATABASE_URL }}' \
             -e JWT_ACCESS_SECRET='${{ secrets.JWT_ACCESS_SECRET }}' \
             -e JWT_REFRESH_SECRET='${{ secrets.JWT_REFRESH_SECRET }}' \
-            -e NODE_ENV='${{ vars.NODE_ENV }}' \
-            -e PORT='${{ vars.PORT }}' \
-            -e WS_PORT='${{ vars.WS_PORT }}' \
-            -e FRONTEND_URL='${{ vars.FRONTEND_URL }}' \
-            -e ALLOWED_ORIGINS='${{ vars.ALLOWED_ORIGINS }}' \
-            -p ${{ vars.PORT }}:${{ vars.PORT }} \
-            -p ${{ vars.WS_PORT }}:${{ vars.WS_PORT }} \
+            -e NODE_ENV="$NODE_ENV" \
+            -e PORT="$PORT" \
+            -e WS_PORT="$WS_PORT" \
+            -e FRONTEND_URL="$FRONTEND_URL" \
+            -e ALLOWED_ORIGINS="$ALLOWED_ORIGINS" \
+            -p $PORT:$PORT \
+            -p $WS_PORT:$WS_PORT \
             "$IMAGE"
 
           echo "Container status:"
