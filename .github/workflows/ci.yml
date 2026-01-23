@@ -3,9 +3,13 @@ name: Main CI Workflow
 on:
   push:
     branches:
+      - main
       - feature/*
       - bugfix/*
       - ci/*
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
