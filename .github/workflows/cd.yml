@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev
+      - cicd/*
   workflow_dispatch:
 
 env:
