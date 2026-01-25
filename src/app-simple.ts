@@ -1067,7 +1067,7 @@ app.get('/api/payments/stats', async (req, res) => {
     });
 
     const completedCount = await prisma.payment.count({
-      where: { status: PaymentStatus.COMPLETED },
+      where: { status: PaymentStatus.PAID },
     });
 
     res.json({
