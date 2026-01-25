@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { notificationService } from './notification.service';
-import { successResponse, errorResponse } from '../../utils/response';
+import { ResponseUtils } from '../../utils/response';
 
 export class NotificationController {
   /**
@@ -8,10 +8,10 @@ export class NotificationController {
    */
   async getNotifications(req: Request, res: Response, next: NextFunction) {
     try {
-      const agentId = req.user?.agentId;
+      const agentId = req.user?.agent?.id;
       
       if (!agentId) {
-        return errorResponse(res, 'Agent ID not found', 401);
+        return ResponseUtils.error(res, 'Agent ID not found', 401);
       }
 
       const { isRead, page, limit } = req.query;
@@ -22,7 +22,7 @@ export class NotificationController {
         limit: limit ? parseInt(limit as string) : 50,
       });
 
-      return successResponse(res, 'Notifications retrieved successfully', result);
+      return ResponseUtils.success(res, result, 'Notifications retrieved successfully');
     } catch (error) {
       next(error);
     }
@@ -33,20 +33,20 @@ export class NotificationController {
    */
   async markAsRead(req: Request, res: Response, next: NextFunction) {
     try {
-      const agentId = req.user?.agentId;
+      const agentId = req.user?.agent?.id;
       
       if (!agentId) {
-        return errorResponse(res, 'Agent ID not found', 401);
+        return ResponseUtils.error(res, 'Agent ID not found', 401);
       }
 
       const { id } = req.params;
 
       const notification = await notificationService.markAsRead(id, agentId);
 
-      return successResponse(res, 'Notification marked as read', notification);
+      return ResponseUtils.success(res, notification, 'Notification marked as read');
     } catch (error) {
       if ((error as Error).message === 'Notification not found') {
-        return errorResponse(res, 'Notification not found', 404);
+        return ResponseUtils.error(res, 'Notification not found', 404);
       }
       next(error);
     }
@@ -57,15 +57,15 @@ export class NotificationController {
    */
   async markAllAsRead(req: Request, res: Response, next: NextFunction) {
     try {
-      const agentId = req.user?.agentId;
+      const agentId = req.user?.agent?.id;
       
       if (!agentId) {
-        return errorResponse(res, 'Agent ID not found', 401);
+        return ResponseUtils.error(res, 'Agent ID not found', 401);
       }
 
       const result = await notificationService.markAllAsRead(agentId);
 
-      return successResponse(res, 'All notifications marked as read', result);
+      return ResponseUtils.success(res, result, 'All notifications marked as read');
     } catch (error) {
       next(error);
     }
@@ -76,20 +76,20 @@ export class NotificationController {
    */
   async deleteNotification(req: Request, res: Response, next: NextFunction) {
     try {
-      const agentId = req.user?.agentId;
+      const agentId = req.user?.agent?.id;
       
       if (!agentId) {
-        return errorResponse(res, 'Agent ID not found', 401);
+        return ResponseUtils.error(res, 'Agent ID not found', 401);
       }
 
       const { id } = req.params;
 
       await notificationService.deleteNotification(id, agentId);
 
-      return successResponse(res, 'Notification deleted successfully', null);
+      return ResponseUtils.success(res, null, 'Notification deleted successfully');
     } catch (error) {
       if ((error as Error).message === 'Notification not found') {
-        return errorResponse(res, 'Notification not found', 404);
+        return ResponseUtils.error(res, 'Notification not found', 404);
       }
       next(error);
     }
@@ -100,15 +100,15 @@ export class NotificationController {
    */
   async getUnreadCount(req: Request, res: Response, next: NextFunction) {
     try {
-      const agentId = req.user?.agentId;
+      const agentId = req.user?.agent?.id;
       
       if (!agentId) {
-        return errorResponse(res, 'Agent ID not found', 401);
+        return ResponseUtils.error(res, 'Agent ID not found', 401);
       }
 
       const result = await notificationService.getUnreadCount(agentId);
 
-      return successResponse(res, 'Unread count retrieved successfully', result);
+      return ResponseUtils.success(res, result, 'Unread count retrieved successfully');
     } catch (error) {
       next(error);
     }
