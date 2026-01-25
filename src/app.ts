@@ -14,6 +14,7 @@ import authRoutes from './modules/auth/auth.routes';
 import agentRoutes from './modules/agent/agent.routes';
 import doctorRoutes from './modules/doctor/doctor.routes';
 import appointmentRoutes from './modules/appointment/appointment.routes';
+import notificationRoutes from './modules/notification/notification.routes';
 // Note: These routes will be added as we implement the modules
 // import paymentRoutes from './modules/payment/payment.routes';
 // import reportRoutes from './modules/report/report.routes';
@@ -81,6 +82,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/agents', agentRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/notifications', notificationRoutes);
 // TODO: Add these routes as modules are implemented
 // app.use('/api/payments', paymentRoutes);
 // app.use('/api/reports', reportRoutes);
