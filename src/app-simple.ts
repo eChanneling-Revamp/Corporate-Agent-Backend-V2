@@ -347,6 +347,23 @@ app.post('/api/appointments', async (req, res) => {
       doctor: doctor.name
     });
 
+    // Create notification for appointment received
+    try {
+      await prisma.notification.create({
+        data: {
+          agentId: defaultAgent.id,
+          type: 'APPOINTMENT_RECEIVED',
+          title: 'New Appointment Received',
+          message: `New appointment for ${appointment.patientName} with ${doctor.name} on ${appointment.date.toLocaleDateString()}`,
+          appointmentId: appointment.id,
+        },
+      });
+      console.log('✓ Notification created for appointment received');
+    } catch (notifError) {
+      console.error('Failed to create notification:', notifError);
+      // Don't fail the appointment creation if notification fails
+    }
+
     // Send "appointment received" email (pending confirmation)
     try {
       console.log('Sending appointment received email to:', patientEmail);
@@ -649,6 +666,22 @@ app.post('/api/appointments/:id/cancel', async (req, res) => {
 
     console.log('Appointment cancelled successfully:', appointment.id);
 
+    // Create notification for appointment cancellation
+    try {
+      await prisma.notification.create({
+        data: {
+          agentId: appointment.agentId,
+          type: 'APPOINTMENT_CANCELLED',
+          title: 'Appointment Cancelled',
+          message: `Appointment for ${appointment.patientName} with ${appointment.doctor.name} has been cancelled. Reason: ${reason}`,
+          appointmentId: appointment.id,
+        },
+      });
+      console.log('✓ Notification created for appointment cancellation');
+    } catch (notifError) {
+      console.error('Failed to create notification:', notifError);
+    }
+
     // Send email notifications
     try {
       const appointmentData = {
@@ -743,6 +776,22 @@ app.post('/api/appointments/:id/confirm', async (req, res) => {
     });
 
     console.log('Appointment confirmed successfully:', appointment.id);
+
+    // Create notification for appointment confirmation
+    try {
+      await prisma.notification.create({
+        data: {
+          agentId: appointment.agentId,
+          type: 'APPOINTMENT_CONFIRMED',
+          title: 'Appointment Confirmed',
+          message: `Appointment for ${appointment.patientName} with ${appointment.doctor.name} on ${appointment.date.toLocaleDateString()} has been confirmed`,
+          appointmentId: appointment.id,
+        },
+      });
+      console.log('✓ Notification created for appointment confirmation');
+    } catch (notifError) {
+      console.error('Failed to create notification:', notifError);
+    }
 
     // Send email notifications
     try {
@@ -904,12 +953,26 @@ app.get('/api/notifications', async (req, res) => {
     const { isRead, page = '1', limit = '50' } = req.query;
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
 
-    // Return empty notifications array for now (data must be an array for frontend .slice())
+    // Get all notifications for all agents (no auth in app-simple)
+    const [notifications, unreadCount] = await Promise.all([
+      prisma.notification.findMany({
+        where: isRead !== undefined ? { isRead: isRead === 'true' } : undefined,
+        orderBy: { createdAt: 'desc' },
+        take: limitNum,
+        skip: skip,
+      }),
+      prisma.notification.count({
+        where: { isRead: false },
+      }),
+    ]);
+
     res.json({
       success: true,
       message: 'Notifications retrieved successfully',
-      data: [],
+      data: notifications,
+      unreadCount,
     });
   } catch (error) {
     console.error('Error fetching notifications:', error);
@@ -925,10 +988,14 @@ app.get('/api/notifications/unread-count', async (req, res) => {
   try {
     console.log('API call to /api/notifications/unread-count');
     
+    const count = await prisma.notification.count({
+      where: { isRead: false },
+    });
+    
     res.json({
       success: true,
       message: 'Unread count retrieved successfully',
-      data: { count: 0 },
+      data: { count },
     });
   } catch (error) {
     console.error('Error getting unread count:', error);
@@ -942,12 +1009,18 @@ app.get('/api/notifications/unread-count', async (req, res) => {
 
 app.patch('/api/notifications/:id/read', async (req, res) => {
   try {
-    console.log('API call to /api/notifications/:id/read');
+    const { id } = req.params;
+    console.log('API call to /api/notifications/:id/read', id);
+    
+    const notification = await prisma.notification.update({
+      where: { id },
+      data: { isRead: true },
+    });
     
     res.json({
       success: true,
       message: 'Notification marked as read',
-      data: null,
+      data: notification,
     });
   } catch (error) {
     console.error('Error marking notification as read:', error);
@@ -963,10 +1036,15 @@ app.patch('/api/notifications/read-all', async (req, res) => {
   try {
     console.log('API call to /api/notifications/read-all');
     
+    const result = await prisma.notification.updateMany({
+      where: { isRead: false },
+      data: { isRead: true },
+    });
+    
     res.json({
       success: true,
       message: 'All notifications marked as read',
-      data: { count: 0 },
+      data: { count: result.count },
     });
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
@@ -980,7 +1058,12 @@ app.patch('/api/notifications/read-all', async (req, res) => {
 
 app.delete('/api/notifications/:id', async (req, res) => {
   try {
-    console.log('API call to DELETE /api/notifications/:id');
+    const { id } = req.params;
+    console.log('API call to DELETE /api/notifications/:id', id);
+    
+    await prisma.notification.delete({
+      where: { id },
+    });
     
     res.json({
       success: true,
