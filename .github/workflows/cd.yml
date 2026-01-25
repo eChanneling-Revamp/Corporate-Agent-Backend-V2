@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev
+      - cicd/*
   workflow_dispatch:
 
 env:
@@ -166,11 +167,19 @@ jobs:
 
       - name: Deploy image on remote server using podman
         run: |
+          # Create .env file for deployment
+          echo "${{ secrets.ENV_FILE }}" > .env
+
+          # Copy .env file to the server
+          scp -o StrictHostKeyChecking=yes -P ${{ secrets.DEV_SERVER_SSH_PORT }} .env ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }}:~/corporate-agent-backend.env
+
+          # Execute remote deployment commands
           ssh -o StrictHostKeyChecking=yes -p ${{ secrets.DEV_SERVER_SSH_PORT }} ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }} << 'REMOTE_EOF'
           set -euo pipefail
 
           IMAGE="ghcr.io/${{ env.IMAGE_NAME }}:latest"
           CONTAINER="corporate-agent-backend"
+          ENV_FILE="corporate-agent-backend.env"
 
           echo "Pulling image: $IMAGE"
           podman pull "$IMAGE"
@@ -178,27 +187,26 @@ jobs:
           echo "Stopping existing container (if any)"
           podman rm -f "$CONTAINER" || true
 
-          echo "Waiting 10 seconds for port cleanup..."
-          sleep 10
+          echo "Waiting 5 seconds for port cleanup..."
+          sleep 5
 
           echo "Starting new container"
           podman run -d \
             --name "$CONTAINER" \
             --replace \
             --restart=always \
-            -e DATABASE_URL='${{ secrets.DATABASE_URL }}' \
-            -e JWT_ACCESS_SECRET='${{ secrets.JWT_ACCESS_SECRET }}' \
-            -e JWT_REFRESH_SECRET='${{ secrets.JWT_REFRESH_SECRET }}' \
-            -e NODE_ENV='${{ vars.NODE_ENV }}' \
-            -e PORT='${{ vars.PORT }}' \
-            -e WS_PORT='${{ vars.WS_PORT }}' \
-            -e FRONTEND_URL='${{ vars.FRONTEND_URL }}' \
-            -e ALLOWED_ORIGINS='${{ vars.ALLOWED_ORIGINS }}' \
+            --env-file "$ENV_FILE" \
             -p ${{ vars.PORT }}:${{ vars.PORT }} \
             -p ${{ vars.WS_PORT }}:${{ vars.WS_PORT }} \
             "$IMAGE"
 
           echo "Container status:"
           podman ps -a --filter "name=$CONTAINER"
+
+          # Clean up the .env file
+          rm -f "$ENV_FILE"
           REMOTE_EOF
+
+          # Clean up local .env file
+          rm -f .env
         shell: bash
