@@ -1148,15 +1148,21 @@ app.post('/api/reports/generate', async (req, res) => {
           pending: payments.filter(p => p.status === 'PENDING').length,
           failed: payments.filter(p => p.status === 'FAILED').length,
         },
-        payments: payments.map(p => ({
-          id: p.id,
-          amount: p.amount,
-          status: p.status,
-          method: p.method,
-          transactionId: p.transactionId,
-          createdAt: p.createdAt,
-          appointmentId: p.appointment?.[0]?.id,
-        })),
+        payments: payments.map(p => {
+          const appointment = Array.isArray(p.appointment) ? p.appointment[0] : p.appointment;
+          return {
+            id: p.id,
+            amount: p.amount,
+            status: p.status,
+            method: p.method,
+            transactionId: p.transactionId || 'N/A',
+            date: p.createdAt,
+            createdAt: p.createdAt,
+            patient: appointment?.patientName || 'N/A',
+            doctor: appointment?.doctor?.name || 'N/A',
+            appointmentId: appointment?.id,
+          };
+        }),
       };
       title = `Revenue Report (${dateFrom} to ${dateTo})`;
     } else {
@@ -1170,7 +1176,7 @@ app.post('/api/reports/generate', async (req, res) => {
 
     const report = {
       id: `report_${Date.now()}`,
-      type: reportType,
+      type: reportType.toUpperCase(),
       title,
       data: reportData,
       parameters: { reportType, dateFrom, dateTo, filters },
