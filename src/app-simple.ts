@@ -893,6 +893,222 @@ app.get('/api/payments', async (req, res) => {
   }
 });
 
+// Notifications endpoints
+app.get('/api/notifications', async (req, res) => {
+  try {
+    console.log('API call to /api/notifications');
+    const agentId = (req as any).user?.agent?.id;
+    
+    if (!agentId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Agent ID not found',
+      });
+    }
+
+    const { isRead, page = '1', limit = '50' } = req.query;
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    const where: any = { agentId };
+    if (isRead !== undefined) {
+      where.isRead = isRead === 'true';
+    }
+
+    const [notifications, total, unreadCount] = await Promise.all([
+      prisma.notification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limitNum,
+      }),
+      prisma.notification.count({ where }),
+      prisma.notification.count({
+        where: { agentId, isRead: false },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      message: 'Notifications retrieved successfully',
+      data: {
+        notifications,
+        pagination: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          totalPages: Math.ceil(total / limitNum),
+        },
+        unreadCount,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch notifications',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+app.get('/api/notifications/unread-count', async (req, res) => {
+  try {
+    const agentId = (req as any).user?.agent?.id;
+    
+    if (!agentId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Agent ID not found',
+      });
+    }
+
+    const count = await prisma.notification.count({
+      where: {
+        agentId,
+        isRead: false,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Unread count retrieved successfully',
+      data: { count },
+    });
+  } catch (error) {
+    console.error('Error getting unread count:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get unread count',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+app.patch('/api/notifications/:id/read', async (req, res) => {
+  try {
+    const agentId = (req as any).user?.agent?.id;
+    
+    if (!agentId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Agent ID not found',
+      });
+    }
+
+    const { id } = req.params;
+
+    const notification = await prisma.notification.findFirst({
+      where: { id, agentId },
+    });
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found',
+      });
+    }
+
+    const updated = await prisma.notification.update({
+      where: { id },
+      data: { isRead: true },
+    });
+
+    res.json({
+      success: true,
+      message: 'Notification marked as read',
+      data: updated,
+    });
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark notification as read',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+app.patch('/api/notifications/read-all', async (req, res) => {
+  try {
+    const agentId = (req as any).user?.agent?.id;
+    
+    if (!agentId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Agent ID not found',
+      });
+    }
+
+    const result = await prisma.notification.updateMany({
+      where: {
+        agentId,
+        isRead: false,
+      },
+      data: {
+        isRead: true,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'All notifications marked as read',
+      data: { count: result.count },
+    });
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark notifications as read',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+app.delete('/api/notifications/:id', async (req, res) => {
+  try {
+    const agentId = (req as any).user?.agent?.id;
+    
+    if (!agentId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Agent ID not found',
+      });
+    }
+
+    const { id } = req.params;
+
+    const notification = await prisma.notification.findFirst({
+      where: { id, agentId },
+    });
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found',
+      });
+    }
+
+    await prisma.notification.delete({
+      where: { id },
+    });
+
+    res.json({
+      success: true,
+      message: 'Notification deleted successfully',
+      data: null,
+    });
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete notification',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Authentication endpoints
 app.post('/api/auth/login', async (req, res) => {
   try {
