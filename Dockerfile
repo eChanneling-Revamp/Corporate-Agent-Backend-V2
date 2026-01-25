@@ -44,6 +44,9 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
 
+# Copy services directory for runtime dependencies
+COPY --from=builder /app/services ./services
+
 # Create a non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001 && \
