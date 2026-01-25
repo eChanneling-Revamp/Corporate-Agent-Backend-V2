@@ -999,17 +999,41 @@ app.get('/api/profile', async (req, res) => {
   try {
     console.log('API call to /api/profile');
     
-    // For now, return a basic profile structure
-    // In a real implementation, this would get the agent from the authenticated user
+    // Get the first agent from the database (in production, use authenticated user)
+    const agent = await prisma.agent.findFirst({
+      include: {
+        user: true,
+      },
+    });
+
+    if (!agent) {
+      // Return mock data if no agent exists
+      return res.json({
+        success: true,
+        message: 'Profile retrieved successfully',
+        data: {
+          name: 'SLT Agent',
+          email: 'agent@slt.lk',
+          companyName: 'Sri Lanka Telecom',
+          phone: '+94 11 1234567',
+          address: 'Colombo, Sri Lanka',
+          createdAt: new Date('2025-01-01').toISOString(),
+        },
+      });
+    }
+
     res.json({
       success: true,
       message: 'Profile retrieved successfully',
       data: {
-        name: 'SLT Agent',
-        email: 'agent@slt.lk',
-        companyName: 'Sri Lanka Telecom',
-        phone: '+94 11 1234567',
-        address: 'Colombo, Sri Lanka',
+        id: agent.id,
+        name: agent.name,
+        email: agent.email,
+        companyName: agent.companyName || 'Sri Lanka Telecom',
+        phone: agent.phone || '+94 11 1234567',
+        address: agent.address || 'Colombo, Sri Lanka',
+        createdAt: agent.createdAt.toISOString(),
+        loginEmail: agent.user?.email,
       },
     });
   } catch (error) {
