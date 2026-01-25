@@ -147,6 +147,7 @@ jobs:
     needs: push-image
     permissions:
       contents: read
+      packages: read
 
     steps:
       - name: Set lowercase image name
@@ -168,7 +169,8 @@ jobs:
 
       - name: Deploy image on remote server using podman
         env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_TOKEN: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME || github.actor }}
         run: |
           # Create .env file for deployment
           echo "${{ secrets.ENV_FILE }}" > .env
@@ -177,7 +179,7 @@ jobs:
           scp -o StrictHostKeyChecking=yes -P ${{ secrets.DEV_SERVER_SSH_PORT }} .env ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }}:~/corporate-agent-backend.env
 
           # Execute remote deployment commands
-          ssh -o StrictHostKeyChecking=yes -p ${{ secrets.DEV_SERVER_SSH_PORT }} ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }} << REMOTE_EOF
+          ssh -o StrictHostKeyChecking=yes -p ${{ secrets.DEV_SERVER_SSH_PORT }} ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }} bash << REMOTE_EOF
           set -euo pipefail
 
           IMAGE="ghcr.io/${{ env.IMAGE_NAME }}:latest"
@@ -185,10 +187,16 @@ jobs:
           ENV_FILE="corporate-agent-backend.env"
 
           echo "Logging in to GitHub Container Registry"
-          echo "$GHCR_TOKEN" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
+          echo "${GHCR_TOKEN}" | podman login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
 
           echo "Pulling image: \$IMAGE"
-          podman pull "\$IMAGE"
+          if ! podman pull "\$IMAGE"; then
+            echo "Failed to pull image. Please check:"
+            echo "1. Image exists in ghcr.io/${{ env.IMAGE_NAME }}"
+            echo "2. Package is public or GHCR_PAT secret has read:packages permission"
+            echo "3. GHCR_USERNAME secret is set correctly"
+            exit 1
+          fi
 
           echo "Stopping existing container (if any)"
           podman rm -f "\$CONTAINER" || true
