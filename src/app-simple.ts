@@ -1210,31 +1210,51 @@ app.get('/api/payments/stats', async (req, res) => {
   try {
     console.log('API call to /api/payments/stats');
     
-    const stats = await prisma.payment.aggregate({
-      _sum: {
-        amount: true,
-      },
-      _count: {
-        id: true,
-      },
-    });
-
-    const pendingCount = await prisma.payment.count({
-      where: { status: PaymentStatus.PENDING },
-    });
-
-    const completedCount = await prisma.payment.count({
+    // Get total revenue from PAID payments
+    const paidStats = await prisma.payment.aggregate({
       where: { status: PaymentStatus.PAID },
+      _sum: { amount: true },
+      _count: { id: true },
     });
+
+    // Get pending amount
+    const pendingStats = await prisma.payment.aggregate({
+      where: { status: PaymentStatus.PENDING },
+      _sum: { amount: true },
+      _count: { id: true },
+    });
+
+    // Get failed count
+    const failedCount = await prisma.payment.count({
+      where: { status: PaymentStatus.FAILED },
+    });
+
+    // Get total payments count
+    const totalCount = await prisma.payment.count();
+
+    const totalRevenue = paidStats._sum.amount || 0;
+    const pendingAmount = pendingStats._sum.amount || 0;
+    const paidCount = paidStats._count.id || 0;
+    const pendingCount = pendingStats._count.id || 0;
+    const averagePayment = paidCount > 0 ? totalRevenue / paidCount : 0;
 
     res.json({
       success: true,
       message: 'Payment stats retrieved successfully',
       data: {
-        totalAmount: stats._sum.amount || 0,
-        totalPayments: stats._count.id || 0,
-        pendingPayments: pendingCount,
-        completedPayments: completedCount,
+        totalRevenue,
+        pendingAmount,
+        totalPayments: totalCount,
+        paidCount,
+        pendingCount,
+        failedCount,
+        averagePayment,
+        paymentMethods: {
+          card: 0,
+          bankTransfer: 0,
+          cash: 0,
+          wallet: 0,
+        },
       },
     });
   } catch (error) {
