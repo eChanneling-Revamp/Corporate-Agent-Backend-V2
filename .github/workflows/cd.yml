@@ -167,6 +167,8 @@ jobs:
           ssh-keyscan -p ${{ secrets.DEV_SERVER_SSH_PORT }} -H ${{ secrets.DEV_SERVER_HOST }} >> ~/.ssh/known_hosts || true
 
       - name: Deploy image on remote server using podman
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Create .env file for deployment
           echo "${{ secrets.ENV_FILE }}" > .env
@@ -175,37 +177,43 @@ jobs:
           scp -o StrictHostKeyChecking=yes -P ${{ secrets.DEV_SERVER_SSH_PORT }} .env ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }}:~/corporate-agent-backend.env
 
           # Execute remote deployment commands
-          ssh -o StrictHostKeyChecking=yes -p ${{ secrets.DEV_SERVER_SSH_PORT }} ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }} << 'REMOTE_EOF'
+          ssh -o StrictHostKeyChecking=yes -p ${{ secrets.DEV_SERVER_SSH_PORT }} ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }} << REMOTE_EOF
           set -euo pipefail
 
           IMAGE="ghcr.io/${{ env.IMAGE_NAME }}:latest"
           CONTAINER="corporate-agent-backend"
           ENV_FILE="corporate-agent-backend.env"
 
-          echo "Pulling image: $IMAGE"
-          podman pull "$IMAGE"
+          echo "Logging in to GitHub Container Registry"
+          echo "$GHCR_TOKEN" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
+
+          echo "Pulling image: \$IMAGE"
+          podman pull "\$IMAGE"
 
           echo "Stopping existing container (if any)"
-          podman rm -f "$CONTAINER" || true
+          podman rm -f "\$CONTAINER" || true
 
           echo "Waiting 5 seconds for port cleanup..."
           sleep 5
 
           echo "Starting new container"
           podman run -d \
-            --name "$CONTAINER" \
+            --name "\$CONTAINER" \
             --replace \
             --restart=always \
-            --env-file "$ENV_FILE" \
+            --env-file "\$ENV_FILE" \
             -p ${{ vars.PORT }}:${{ vars.PORT }} \
             -p ${{ vars.WS_PORT }}:${{ vars.WS_PORT }} \
-            "$IMAGE"
+            "\$IMAGE"
 
           echo "Container status:"
-          podman ps -a --filter "name=$CONTAINER"
+          podman ps -a --filter "name=\$CONTAINER"
+
+          # Logout from registry
+          podman logout ghcr.io
 
           # Clean up the .env file
-          rm -f "$ENV_FILE"
+          rm -f "\$ENV_FILE"
           REMOTE_EOF
 
           # Clean up local .env file
