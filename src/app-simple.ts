@@ -7,7 +7,10 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { PrismaClient, PaymentStatus } from '@prisma/client';
-const emailService = require('./services/emailService');
+import path from 'path';
+
+// Import email service from root services folder
+const emailService = require(path.join(__dirname, '..', 'services', 'emailService.js'));
 
 // Load environment variables
 dotenv.config();
