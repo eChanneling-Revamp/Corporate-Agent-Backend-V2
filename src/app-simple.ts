@@ -1022,18 +1022,184 @@ app.get('/api/profile', async (req, res) => {
   }
 });
 
-// Reports endpoint
+// Reports endpoints
 app.get('/api/reports', async (req, res) => {
   try {
     console.log('API call to /api/reports');
     
     // Return empty reports for now
-    res.json([]);
+    res.json({
+      success: true,
+      data: [],
+    });
   } catch (error) {
     console.error('Error fetching reports:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch reports',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+app.post('/api/reports/generate', async (req, res) => {
+  try {
+    console.log('API call to POST /api/reports/generate');
+    const { reportType, dateFrom, dateTo, filters } = req.body;
+
+    console.log('Generating report:', { reportType, dateFrom, dateTo });
+
+    // Generate report based on type
+    let reportData: any = {};
+    let title = '';
+
+    if (reportType === 'appointments') {
+      const appointments = await prisma.appointment.findMany({
+        where: {
+          date: {
+            gte: new Date(dateFrom),
+            lte: new Date(dateTo),
+          },
+        },
+        include: {
+          doctor: true,
+          payment: true,
+        },
+        orderBy: {
+          date: 'desc',
+        },
+      });
+
+      reportData = {
+        totalAppointments: appointments.length,
+        byStatus: {
+          pending: appointments.filter(a => a.status === 'PENDING').length,
+          confirmed: appointments.filter(a => a.status === 'CONFIRMED').length,
+          completed: appointments.filter(a => a.status === 'COMPLETED').length,
+          cancelled: appointments.filter(a => a.status === 'CANCELLED').length,
+        },
+        appointments: appointments.map(a => ({
+          id: a.id,
+          patientName: a.patientName,
+          doctorName: a.doctor.name,
+          specialty: a.doctor.specialty,
+          hospital: a.doctor.hospital,
+          date: a.date,
+          timeSlot: a.timeSlot,
+          status: a.status,
+          amount: a.amount,
+          paymentStatus: a.payment?.status || 'PENDING',
+        })),
+      };
+      title = `Appointments Report (${dateFrom} to ${dateTo})`;
+    } else if (reportType === 'revenue') {
+      const payments = await prisma.payment.findMany({
+        where: {
+          createdAt: {
+            gte: new Date(dateFrom),
+            lte: new Date(dateTo),
+          },
+        },
+        include: {
+          appointment: {
+            include: {
+              doctor: true,
+            },
+          },
+        },
+      });
+
+      const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
+      const paidRevenue = payments
+        .filter(p => p.status === 'PAID')
+        .reduce((sum, p) => sum + p.amount, 0);
+
+      reportData = {
+        totalRevenue,
+        paidRevenue,
+        pendingRevenue: totalRevenue - paidRevenue,
+        paymentCount: payments.length,
+        byStatus: {
+          paid: payments.filter(p => p.status === 'PAID').length,
+          pending: payments.filter(p => p.status === 'PENDING').length,
+          failed: payments.filter(p => p.status === 'FAILED').length,
+        },
+        payments: payments.map(p => ({
+          id: p.id,
+          amount: p.amount,
+          status: p.status,
+          method: p.method,
+          transactionId: p.transactionId,
+          createdAt: p.createdAt,
+          appointmentId: p.appointment?.[0]?.id,
+        })),
+      };
+      title = `Revenue Report (${dateFrom} to ${dateTo})`;
+    } else {
+      // Generic report
+      reportData = {
+        message: 'Report type not yet implemented',
+        type: reportType,
+      };
+      title = `${reportType} Report (${dateFrom} to ${dateTo})`;
+    }
+
+    const report = {
+      id: `report_${Date.now()}`,
+      type: reportType,
+      title,
+      data: reportData,
+      parameters: { reportType, dateFrom, dateTo, filters },
+      createdAt: new Date().toISOString(),
+    };
+
+    res.json({
+      success: true,
+      message: 'Report generated successfully',
+      data: report,
+    });
+  } catch (error) {
+    console.error('Error generating report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate report',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+app.get('/api/reports/:id', async (req, res) => {
+  try {
+    console.log('API call to GET /api/reports/:id');
+    
+    // For now, return not found
+    res.status(404).json({
+      success: false,
+      message: 'Report not found',
+    });
+  } catch (error) {
+    console.error('Error fetching report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch report',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+app.delete('/api/reports/:id', async (req, res) => {
+  try {
+    console.log('API call to DELETE /api/reports/:id');
+    
+    res.json({
+      success: true,
+      message: 'Report deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete report',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
