@@ -6,7 +6,7 @@ import compression from 'compression';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, PaymentStatus } from '@prisma/client';
 const emailService = require('./services/emailService');
 
 // Load environment variables
@@ -1063,11 +1063,11 @@ app.get('/api/payments/stats', async (req, res) => {
     });
 
     const pendingCount = await prisma.payment.count({
-      where: { status: 'PENDING' },
+      where: { status: PaymentStatus.PENDING },
     });
 
     const completedCount = await prisma.payment.count({
-      where: { status: 'COMPLETED' },
+      where: { status: PaymentStatus.COMPLETED },
     });
 
     res.json({
