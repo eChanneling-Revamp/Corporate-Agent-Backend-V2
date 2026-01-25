@@ -902,20 +902,11 @@ app.get('/api/notifications', async (req, res) => {
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
 
-    // Return empty notifications for now
+    // Return empty notifications array for now (data must be an array for frontend .slice())
     res.json({
       success: true,
       message: 'Notifications retrieved successfully',
-      data: {
-        notifications: [],
-        pagination: {
-          total: 0,
-          page: pageNum,
-          limit: limitNum,
-          totalPages: 0,
-        },
-        unreadCount: 0,
-      },
+      data: [],
     });
   } catch (error) {
     console.error('Error fetching notifications:', error);
