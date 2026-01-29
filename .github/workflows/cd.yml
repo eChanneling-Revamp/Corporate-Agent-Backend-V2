@@ -166,6 +166,16 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -p ${{ secrets.DEV_SERVER_SSH_PORT }} -H ${{ secrets.DEV_SERVER_HOST }} >> ~/.ssh/known_hosts || true
+          # Add SSH keepalive settings
+          cat >> ~/.ssh/config << EOF
+          Host deployment-server
+            HostName ${{ secrets.DEV_SERVER_HOST }}
+            Port ${{ secrets.DEV_SERVER_SSH_PORT }}
+            User ${{ secrets.DEV_SERVER_USER }}
+            ServerAliveInterval 60
+            ServerAliveCountMax 120
+            TCPKeepAlive yes
+          EOF
 
       - name: Deploy image on remote server using podman
         env:
@@ -176,10 +186,10 @@ jobs:
           echo "${{ secrets.ENV_FILE }}" > .env
 
           # Copy .env file to the server
-          scp -o StrictHostKeyChecking=yes -P ${{ secrets.DEV_SERVER_SSH_PORT }} .env ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }}:~/corporate-agent-backend.env
+          scp -o StrictHostKeyChecking=yes deployment-server:~/corporate-agent-backend.env < .env
 
           # Execute remote deployment commands
-          ssh -o StrictHostKeyChecking=yes -p ${{ secrets.DEV_SERVER_SSH_PORT }} ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }} bash << REMOTE_EOF
+          ssh -o StrictHostKeyChecking=yes deployment-server bash << REMOTE_EOF
           set -euo pipefail
 
           IMAGE="ghcr.io/${{ env.IMAGE_NAME }}:latest"
