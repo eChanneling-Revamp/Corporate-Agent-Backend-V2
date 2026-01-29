@@ -4,7 +4,7 @@ FROM node:20-alpine AS builder
 # Set working directory
 WORKDIR /app
 
-# Install dependencies required for building (including devDependencies for tsc)
+# Install dependencies required for Prisma generation
 COPY package*.json ./
 COPY prisma ./prisma/
 
@@ -14,11 +14,8 @@ RUN npm ci
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Copy source code
+# Copy source code (we'll use server-simple.js directly, no TypeScript build needed)
 COPY . .
-
-# Build the application
-RUN npm run build
 
 # Stage 2: Production
 FROM node:20-alpine AS runner
@@ -41,10 +38,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
-# Copy built application from builder stage
-COPY --from=builder /app/dist ./dist
-
-# Copy services directory for runtime dependencies
+# Copy server file and services directly (skip TypeScript build)
+COPY --from=builder /app/server-simple.js ./server-simple.js
 COPY --from=builder /app/services ./services
 
 # Create a non-root user for security
@@ -58,5 +53,5 @@ USER nodejs
 # Expose the application port
 EXPOSE 3001
 
-# Start the application
-CMD ["node", "dist/server-simple.js"]
+# Start the application using server-simple.js directly
+CMD ["node", "server-simple.js"]
