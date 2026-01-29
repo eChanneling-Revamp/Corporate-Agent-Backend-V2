@@ -1,220 +1,812 @@
 generator client {
   provider = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Nurse {
+  id                 String    @id @default(cuid())
+  fullName           String
+  email              String
+  password           String    @db.VarChar
+  experience         String?
+  createdAt          DateTime  @db.Time(6)
+  hospitalId         String?
+  active             String?
+  currentSession     String?
+  profilePhoto       String?
+  updatedAt          DateTime? @updatedAt @db.Timestamp(6)
+  passwordChangedAt  DateTime? @db.Date
+  twoFactorEnabled   Boolean?
+  twoFactorMethod    String?
+  twoFactorUpdatedAt DateTime? @db.Date
+  phone              String?   @db.VarChar(20)
+  username           String?
+  age                String?
+  hospitals          Hospital? @relation(fields: [hospitalId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "hospitalId")
+
+  @@map("nurses")
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  role      Role     @default(AGENT)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  agent     Agent?
+  id                                                       String               @id @default(cuid())
+  email                                                    String               @unique
+  password                                                 String
+  name                                                     String
+  role                                                     UserRole             @default(AGENT)
+  companyName                                              String?
+  contactNumber                                            String?
+  isActive                                                 Boolean              @default(true)
+  isEmailVerified                                          Boolean              @default(false)
+  emailVerificationToken                                   String?
+  passwordResetToken                                       String?
+  passwordResetExpires                                     DateTime?
+  lastLoginAt                                              DateTime?
+  createdAt                                                DateTime             @default(now())
+  updatedAt                                                DateTime             @updatedAt
+  activity_logs                                            activity_logs[]
+  appointments                                             Appointment[]
+  corporate_packages_corporate_packages_corporateIdTousers corporate_packages[] @relation("corporate_packages_corporateIdTousers")
+  corporate_packages_corporate_packages_createdByTousers   corporate_packages[] @relation("corporate_packages_createdByTousers")
+  customers_customers_assignedAgentIdTousers               customers[]          @relation("customers_assignedAgentIdTousers")
+  customers_customers_createdByIdTousers                   customers[]          @relation("customers_createdByIdTousers")
+  notifications                                            notifications[]
+  reports                                                  reports[]
+  support_tickets_support_tickets_assignedAgentIdTousers   support_tickets[]    @relation("support_tickets_assignedAgentIdTousers")
+  support_tickets_support_tickets_createdByIdTousers       support_tickets[]    @relation("support_tickets_createdByIdTousers")
+  tasks                                                    tasks[]
+  ticket_messages                                          ticket_messages[]
 
   @@map("users")
 }
 
-model Agent {
-  id           String        @id @default(uuid())
-  name         String
-  companyName  String?
-  email        String
-  phone        String?
-  address      String?
-  isActive     Boolean       @default(true)
-  userId       String        @unique
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  appointments Appointment[]
-  integrations Integration[]
-  payments     Payment[]
-  reports      Report[]
-
-  @@map("agents")
-}
-
 model Doctor {
-  id              String        @id @default(uuid())
+  id              String           @id @default(cuid())
   name            String
-  specialty       String
-  hospital        String
-  phone           String?
-  email           String?
-  consultationFee Float         @default(0)
-  rating          Float         @default(0)
-  photoUrl        String?
+  email           String           @unique
+  specialization  String
+  qualification   String
+  experience      Int
+  phonenumber     String
+  consultationFee Decimal          @db.Decimal(10, 2)
+  rating          Decimal?         @db.Decimal(3, 2)
+  profileImage    String?
   description     String?
-  availableDates  Json?
-  isActive        Boolean       @default(true)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  appointments    Appointment[]
+  languages       String[]
+  availableDays   String[]
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  status          doctor_status    @default(PENDING)
+  hospitalId      String[]         @default([]) @map("hospitalIds")
+  hospitals       DoctorHospital[]
+  prescriptions   Prescription[]
+  sessions        Session[]
+  time_slots      time_slots[]
 
   @@map("doctors")
 }
 
-model Appointment {
-  id                 String            @id @default(uuid())
-  agentId            String
-  doctorId           String
-  patientName        String
-  patientNIC         String?
-  patientEmail       String
-  patientPhone       String
-  date               DateTime
-  timeSlot           String
-  status             AppointmentStatus @default(PENDING)
-  amount             Float
-  paymentMethod      PaymentMethod     @default(BILL_TO_PHONE)
-  sltPhoneNumber     String?
-  employeeNIC        String?
-  notes              String?
-  cancelReason       String?
-  paymentId          String?           @unique
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  agent        Agent             @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  doctor       Doctor            @relation(fields: [doctorId], references: [id])
-  payment      Payment?          @relation(fields: [paymentId], references: [id])
+model Nurse_Detail {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  experience    Int
+  phonenumber   String
+  profileImage  String?
+  availableDays String[]
+  isActive      Boolean   @default(true)
+  hospitalId    String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  age           Int?
+  hospitals     Hospital  @relation(fields: [hospitalId], references: [id])
+  sessions      Session[]
 
+  @@map("nurse_details")
+}
+
+model Hospital {
+  id            String           @id @default(cuid())
+  name          String
+  address       String
+  city          String
+  district      String
+  contactNumber String
+  email         String           @unique
+  website       String?
+  facilities    String[]
+  isActive      Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  status        hospital_status  @default(PENDING)
+  profileImage  String?
+  doctors       DoctorHospital[]
+  nurse_details Nurse_Detail[]
+  nurses        Nurse[]
+  sessions      Session[]
+
+  @@map("hospitals")
+}
+
+model Session {
+  id            String        @id @default(cuid())
+  doctorId      String
+  nurseId       String
+  capacity      Int           @default(5)
+  location      String
+  hospitalId    String
+  status        sessionstatus @default(SCHEDULED)
+  createdAt     DateTime      @default(now()) @db.Timestamp(6)
+  scheduledAt   DateTime      @db.Timestamp(6)
+  startTime     DateTime      @db.Timestamp(6)
+  endTime       DateTime      @db.Timestamp(6)
+  appointments  Appointment[]
+  doctors       Doctor        @relation(fields: [doctorId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "doctorId")
+  hospitals     Hospital      @relation(fields: [hospitalId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "hospitalId")
+  nurse_details Nurse_Detail  @relation(fields: [nurseId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "nurseId")
+
+  @@map("sessions")
+}
+
+model Appointment {
+  id                             String                           @id @default(cuid())
+  appointmentNumber              String                           @unique
+  patientName                    String
+  patientEmail                   String
+  patientPhone                   String
+  patientNIC                     String?
+  patientDateOfBirth             DateTime?
+  patientGender                  Gender?
+  emergencyContactName           String?
+  emergencyContactPhone          String?
+  medicalHistory                 String?
+  currentMedications             String?
+  allergies                      String?
+  insuranceProvider              String?
+  insurancePolicyNumber          String?
+  isNewPatient                   Boolean                          @default(true)
+  bookedById                     String
+  estimatedWaitTime              Int?
+  queuePosition                  Int?
+  status                         AppointmentStatus                @default(CONFIRMED)
+  paymentStatus                  PaymentStatus                    @default(PENDING)
+  consultationFee                Decimal                          @db.Decimal(10, 2)
+  totalAmount                    Decimal                          @db.Decimal(10, 2)
+  notes                          String?
+  cancellationReason             String?
+  cancellationDate               DateTime?
+  createdAt                      DateTime                         @default(now())
+  updatedAt                      DateTime                         @updatedAt
+  sessionId                      String
+  users                          User                             @relation(fields: [bookedById], references: [id])
+  session                        Session                          @relation(fields: [sessionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  corporate_package_appointments corporate_package_appointments[]
+  notification_logs              notification_logs[]
+  payments                       payments[]
+  prescriptions                  Prescription[]
+
+  @@index([status], map: "idx_appointments_status")
+  @@index([patientEmail], map: "idx_appointments_patient_email")
   @@map("appointments")
 }
 
-model Payment {
-  id            String        @id @default(uuid())
-  amount        Float
-  status        PaymentStatus @default(PENDING)
-  method        PaymentMethod @default(BILL_TO_PHONE)
-  transactionId String?       @unique
-  agentId       String?
-  notes         String?
-  processedAt   DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  appointment   Appointment?
-  agent         Agent?        @relation(fields: [agentId], references: [id])
+model Prescription {
+  id                   String             @id @default(cuid())
+  prescriptionNumber   String             @unique
+  appointmentId        String
+  patientEmail         String
+  doctorId             String
+  htmlContent          String
+  status               PrescriptionStatus @default(ACTIVE)
+  version              Int                @default(1)
+  parentPrescriptionId String?
+  isLatestVersion      Boolean            @default(true)
+  editReason           String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  appointment          Appointment        @relation(fields: [appointmentId], references: [id])
+  doctor               Doctor             @relation(fields: [doctorId], references: [id])
+  parentPrescription   Prescription?      @relation("PrescriptionVersions", fields: [parentPrescriptionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  childPrescriptions   Prescription[]     @relation("PrescriptionVersions")
 
-  @@map("payments")
+  @@index([appointmentId], map: "idx_prescription_appointment")
+  @@index([patientEmail], map: "idx_prescription_patient")
+  @@index([doctorId], map: "idx_prescription_doctor")
+  @@index([createdAt], map: "idx_prescription_created")
+  @@index([parentPrescriptionId], map: "idx_prescription_parent")
+  @@map("prescriptions")
 }
 
-model Report {
-  id         String     @id @default(uuid())
-  agentId    String
-  type       ReportType
-  title      String
-  data       Json
-  parameters Json?
-  fileUrl    String?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-  agent      Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  @@map("reports")
+model activity_logs {
+  id         String   @id
+  userId     String
+  action     String
+  entityType String
+  entityId   String?
+  details    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  users      User     @relation(fields: [userId], references: [id])
 }
 
-model Integration {
-  id         String    @id @default(uuid())
-  agentId    String
-  name       String
-  provider   String
-  apiKey     String
-  secretKey  String?
-  config     Json?
-  isActive   Boolean   @default(true)
-  lastUsedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  agent      Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+model audit_logs {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String?   @db.VarChar(255)
+  username    String?   @db.VarChar(255)
+  action      String    @db.VarChar(100)
+  resource    String?   @db.VarChar(100)
+  resource_id String?   @db.VarChar(255)
+  details     Json?
+  ip_address  String?   @db.VarChar(50)
+  user_agent  String?
+  timestamp   DateTime? @default(now()) @db.Timestamp(6)
 
-  @@map("integrations")
+  @@index([action], map: "idx_audit_logs_action")
+  @@index([timestamp], map: "idx_audit_logs_timestamp")
+  @@index([user_id], map: "idx_audit_logs_user_id")
 }
 
-model RefreshToken {
-  id        String   @id @default(uuid())
-  token     String   @unique
+model corporate_package_appointments {
+  id                 String             @id
+  packageId          String
+  appointmentId      String
+  usedAt             DateTime           @default(now())
+  discountApplied    Decimal?           @db.Decimal(10, 2)
+  appointments       Appointment        @relation(fields: [appointmentId], references: [id])
+  corporate_packages corporate_packages @relation(fields: [packageId], references: [id])
+
+  @@unique([packageId, appointmentId])
+}
+
+model corporate_package_benefits {
+  id                 String             @id
+  packageId          String
+  benefitType        String
+  benefitDescription String
+  benefitValue       Decimal?           @db.Decimal(10, 2)
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  corporate_packages corporate_packages @relation(fields: [packageId], references: [id])
+}
+
+model corporate_packages {
+  id                                          String                           @id
+  packageNumber                               String                           @unique
+  corporateId                                 String
+  packageName                                 String
+  packageType                                 String
+  description                                 String?
+  totalAppointments                           Int
+  usedAppointments                            Int                              @default(0)
+  remainingAppointments                       Int
+  packageValue                                Decimal                          @db.Decimal(10, 2)
+  discountPercentage                          Decimal                          @default(0) @db.Decimal(5, 2)
+  validFromDate                               DateTime                         @db.Date
+  validToDate                                 DateTime                         @db.Date
+  restrictions                                Json?
+  isActive                                    Boolean                          @default(true)
+  createdBy                                   String
+  deactivatedBy                               String?
+  deactivatedAt                               DateTime?
+  createdAt                                   DateTime                         @default(now())
+  updatedAt                                   DateTime
+  corporate_package_appointments              corporate_package_appointments[]
+  corporate_package_benefits                  corporate_package_benefits[]
+  users_corporate_packages_corporateIdTousers User                             @relation("corporate_packages_corporateIdTousers", fields: [corporateId], references: [id])
+  users_corporate_packages_createdByTousers   User                             @relation("corporate_packages_createdByTousers", fields: [createdBy], references: [id])
+}
+
+model customers {
+  id                                     String              @id
+  customerNumber                         String              @unique
+  firstName                              String
+  lastName                               String
+  email                                  String              @unique
+  phone                                  String
+  dateOfBirth                            DateTime?           @db.Date
+  gender                                 Gender?
+  street                                 String?
+  city                                   String?
+  state                                  String?
+  zipCode                                String?
+  country                                String              @default("Sri Lanka")
+  emergencyContactName                   String?
+  emergencyContactRelationship           String?
+  emergencyContactPhone                  String?
+  bloodType                              String?
+  allergies                              String[]
+  chronicConditions                      String[]
+  currentMedications                     String[]
+  insuranceProvider                      String?
+  insurancePolicyNumber                  String?
+  insuranceGroupNumber                   String?
+  insuranceValidUntil                    DateTime?           @db.Date
+  preferredLanguage                      String              @default("English")
+  communicationMethod                    CommunicationMethod @default(EMAIL)
+  appointmentReminders                   Boolean             @default(true)
+  newsletterSubscription                 Boolean             @default(false)
+  tags                                   String[]
+  status                                 CustomerStatus      @default(ACTIVE)
+  totalAppointments                      Int                 @default(0)
+  lastAppointmentAt                      DateTime?
+  nextAppointmentAt                      DateTime?
+  customerValue                          Decimal             @default(0) @db.Decimal(10, 2)
+  satisfaction                           Decimal?            @db.Decimal(3, 2)
+  assignedAgentId                        String?
+  createdById                            String?
+  createdAt                              DateTime            @default(now())
+  updatedAt                              DateTime
+  users_customers_assignedAgentIdTousers User?               @relation("customers_assignedAgentIdTousers", fields: [assignedAgentId], references: [id])
+  users_customers_createdByIdTousers     User?               @relation("customers_createdByIdTousers", fields: [createdById], references: [id])
+  support_tickets                        support_tickets[]
+}
+
+model export_jobs {
+  id               String       @id
+  jobId            String       @unique
+  entityType       String
+  format           ExportFormat
+  fileName         String
+  status           ExportStatus @default(PROCESSING)
+  exportedBy       String
+  totalRecords     Int          @default(0)
+  processedRecords Int          @default(0)
+  filters          Json?
+  columns          String[]
+  filePath         String?
+  fileSize         Int?
+  downloadUrl      String?
+  expiresAt        DateTime?
+  emailRecipients  String[]
+  errorMessage     String?
+  completedAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime
+}
+
+model notification_logs {
+  id               String       @id
+  notificationId   String       @unique
+  type             String
+  method           String
+  recipient        String
+  status           String
+  priority         String       @default("normal")
+  templateData     Json?
+  appointmentId    String?
+  triggeredBy      String?
+  scheduledFor     DateTime?
+  sentAt           DateTime?
+  failureReason    String?
+  providerResponse Json?
+  createdAt        DateTime     @default(now())
+  appointments     Appointment? @relation(fields: [appointmentId], references: [id])
+}
+
+model notifications {
+  id        String           @id
   userId    String
-  expiresAt DateTime
+  title     String
+  message   String
+  type      NotificationType
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  data      Json?
+  createdAt DateTime         @default(now())
+  users     User             @relation(fields: [userId], references: [id])
+}
+
+model patient_devices {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patient_id   String    @db.VarChar(255)
+  device_token String?
+  fcm_token    String?
+  device_type  String?   @db.VarChar(50)
+  device_name  String?   @db.VarChar(255)
+  is_active    Boolean?  @default(true)
+  created_at   DateTime? @default(now()) @db.Timestamp(6)
+  last_used    DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([is_active], map: "idx_patient_devices_active")
+  @@index([patient_id], map: "idx_patient_devices_patient_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model patient_feedback {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patient_id             String?   @db.VarChar(255)
+  patient_name           String?   @db.VarChar(255)
+  session_id             String?   @db.VarChar(255)
+  doctor_id              String?   @db.VarChar(255)
+  doctor_name            String?   @db.VarChar(255)
+  rating                 Int?
+  feedback               String?
+  wait_time_rating       Int?
+  service_quality_rating Int?
+  created_at             DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([created_at], map: "idx_patient_feedback_created_at")
+  @@index([doctor_id], map: "idx_patient_feedback_doctor_id")
+  @@index([rating], map: "idx_patient_feedback_rating")
+}
+
+model patient_history {
+  id                        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patient_id                String    @db.VarChar(255)
+  patient_name              String?   @db.VarChar(255)
+  phone                     String?   @db.VarChar(50)
+  session_id                String?   @db.VarChar(255)
+  doctor_id                 String?   @db.VarChar(255)
+  doctor_name               String?   @db.VarChar(255)
+  running_number            Int?
+  status                    String?   @db.VarChar(50)
+  source                    String?   @db.VarChar(50)
+  is_extra                  Boolean?  @default(false)
+  wait_time_minutes         Int?
+  consultation_time_minutes Int?
+  visit_date                DateTime? @db.Timestamp(6)
+  notes                     String?
+  created_at                DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([doctor_id], map: "idx_patient_history_doctor_id")
+  @@index([patient_id], map: "idx_patient_history_patient_id")
+  @@index([phone], map: "idx_patient_history_phone")
+  @@index([visit_date], map: "idx_patient_history_visit_date")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model patients {
+  id                        Int       @id @default(autoincrement())
+  patient_name              String
+  phone                     String
+  age                       Int?
+  emergency_contact         String?
+  session_id                String
+  running_number            Int
+  source                    String
+  status                    String
+  created_at                DateTime? @default(now()) @db.Timestamp(6)
+  is_extra                  Boolean?  @default(false)
+  wait_start_time           DateTime? @db.Timestamp(6)
+  wait_end_time             DateTime? @db.Timestamp(6)
+  wait_time_minutes         Int?
+  cancellation_reason       String?
+  cancelled_at              DateTime? @db.Timestamp(6)
+  cancelled_by              String?   @db.VarChar(255)
+  consultation_start_time   DateTime? @db.Timestamp(6)
+  consultation_end_time     DateTime? @db.Timestamp(6)
+  consultation_time_minutes Int?
+  marked_no_show_at         DateTime? @db.Timestamp(6)
+  no_show_reason            String?
+  email                     String?   @db.VarChar(255)
+
+  @@unique([session_id, running_number])
+  @@index([created_at], map: "idx_patients_created_at")
+  @@index([is_extra], map: "idx_patients_is_extra")
+  @@index([running_number], map: "idx_patients_running_number")
+  @@index([session_id], map: "idx_patients_session_id")
+  @@index([status], map: "idx_patients_status")
+}
+
+model payments {
+  id              String        @id
+  appointmentId   String
+  amount          Decimal       @db.Decimal(10, 2)
+  currency        String        @default("LKR")
+  paymentMethod   PaymentMethod
+  transactionId   String?       @unique
+  gatewayResponse Json?
+  status          PaymentStatus @default(PENDING)
+  paidAt          DateTime?
+  refundedAt      DateTime?
+  refundAmount    Decimal?      @db.Decimal(10, 2)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime
+  appointments    Appointment   @relation(fields: [appointmentId], references: [id])
+}
+
+model reports {
+  id            String       @id
+  title         String
+  type          String
+  description   String?
+  parameters    Json?
+  filePath      String?
+  status        ReportStatus @default(PENDING)
+  generatedById String
+  scheduledAt   DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime
+  old_type      ReportType?
+  users         User         @relation(fields: [generatedById], references: [id])
+}
+
+model reports_cache {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  report_type  String    @db.VarChar(100)
+  report_key   String    @db.VarChar(255)
+  report_data  Json?
+  generated_at DateTime? @default(now()) @db.Timestamp(6)
+  expires_at   DateTime? @db.Timestamp(6)
+
+  @@unique([report_type, report_key])
+  @@index([expires_at], map: "idx_reports_cache_expires")
+  @@index([report_type, report_key], map: "idx_reports_cache_type_key")
+}
+
+model support_tickets {
+  id                                           String            @id
+  ticketNumber                                 String            @unique
+  customerId                                   String
+  customerName                                 String
+  customerEmail                                String
+  title                                        String
+  description                                  String
+  category                                     TicketCategory
+  priority                                     TicketPriority    @default(MEDIUM)
+  status                                       TicketStatus      @default(OPEN)
+  assignedAgentId                              String?
+  assignedAgentName                            String?
+  estimatedResolutionAt                        DateTime?
+  actualResolutionAt                           DateTime?
+  closedAt                                     DateTime?
+  tags                                         String[]
+  satisfactionRating                           Decimal?          @db.Decimal(3, 2)
+  resolutionNotes                              String?
+  createdById                                  String?
+  createdAt                                    DateTime          @default(now())
+  updatedAt                                    DateTime
+  users_support_tickets_assignedAgentIdTousers User?             @relation("support_tickets_assignedAgentIdTousers", fields: [assignedAgentId], references: [id])
+  users_support_tickets_createdByIdTousers     User?             @relation("support_tickets_createdByIdTousers", fields: [createdById], references: [id])
+  customers                                    customers         @relation(fields: [customerId], references: [id])
+  ticket_messages                              ticket_messages[]
+}
+
+model tasks {
+  id           String       @id
+  title        String
+  description  String?
+  priority     TaskPriority @default(MEDIUM)
+  status       TaskStatus   @default(PENDING)
+  dueDate      DateTime?
+  assignedToId String
+  createdById  String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime
+  users        User         @relation(fields: [assignedToId], references: [id])
+}
+
+model ticket_messages {
+  id              String            @id
+  ticketId        String
+  senderId        String?
+  senderName      String
+  senderType      MessageSenderType
+  message         String
+  attachments     String[]
+  isInternal      Boolean           @default(false)
+  readAt          DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  users           User?             @relation(fields: [senderId], references: [id])
+  support_tickets support_tickets   @relation(fields: [ticketId], references: [id])
+}
+
+model time_slots {
+  id              String   @id
+  doctorId        String
+  date            DateTime @db.Date
+  startTime       DateTime @db.Time(6)
+  endTime         DateTime @db.Time(6)
+  maxAppointments Int      @default(20)
+  currentBookings Int      @default(0)
+  isActive        Boolean  @default(true)
+  consultationFee Decimal  @db.Decimal(10, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+  doctors         Doctor   @relation(fields: [doctorId], references: [id])
+
+  @@unique([doctorId, date, startTime])
+}
+
+model translations {
+  id        String   @id
+  language  String
+  module    String
+  key       String
+  value     String
+  context   String?
+  createdBy String
+  updatedBy String
   createdAt DateTime @default(now())
+  updatedAt DateTime
 
-  @@map("refresh_tokens")
+  @@unique([language, module, key])
 }
 
-model AuditLog {
-  id        String   @id @default(uuid())
-  userId    String?
-  action    String
-  entity    String
-  entityId  String?
-  oldData   Json?
-  newData   Json?
-  ipAddress String?
-  userAgent String?
-  createdAt DateTime @default(now())
+model DoctorHospital {
+  id         String   @id @default(cuid())
+  doctorId   String
+  hospitalId String
+  assignedAt DateTime @default(now())
+  isActive   Boolean  @default(true)
+  doctor     Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
 
-  @@map("audit_logs")
-}
-
-model Notification {
-  id             String           @id @default(uuid())
-  agentId        String
-  type           NotificationType
-  title          String
-  message        String
-  appointmentId  String?
-  isRead         Boolean          @default(false)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-
-  @@map("notifications")
-  @@index([agentId, isRead])
-}
-
-enum Role {
-  ADMIN
-  AGENT
-  MANAGER
-}
-
-enum NotificationType {
-  APPOINTMENT_RECEIVED
-  APPOINTMENT_CONFIRMED
-  APPOINTMENT_CANCELLED
+  @@unique([doctorId, hospitalId])
+  @@map("doctor_hospitals")
 }
 
 enum AppointmentStatus {
-  PENDING
   CONFIRMED
   CANCELLED
   COMPLETED
   NO_SHOW
+  RESCHEDULED
+  UNPAID
 }
 
 enum PaymentStatus {
   PENDING
-  PAID
+  COMPLETED
   FAILED
   REFUNDED
   CANCELLED
+  UNPAID
+}
+
+enum CommunicationMethod {
+  EMAIL
+  SMS
+  PHONE
+  WHATSAPP
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  BLACKLISTED
+}
+
+enum ExportFormat {
+  CSV
+  EXCEL
+  PDF
+  JSON
+}
+
+enum ExportStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum MessageSenderType {
+  CUSTOMER
+  AGENT
+  SYSTEM
+  ADMIN
+}
+
+enum NotificationType {
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_CANCELLED
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  TASK_ASSIGNED
+  SYSTEM_ALERT
+  REMINDER
 }
 
 enum PaymentMethod {
-  BILL_TO_PHONE
-  DEDUCT_FROM_SALARY
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_TRANSFER
+  CASH
+  MOBILE_PAYMENT
+}
+
+enum ReportStatus {
+  PENDING
+  GENERATING
+  COMPLETED
+  FAILED
 }
 
 enum ReportType {
-  APPOINTMENTS
-  REVENUE
-  DOCTOR_PERFORMANCE
-  HOSPITAL_ANALYTICS
+  APPOINTMENT_SUMMARY
+  REVENUE_ANALYSIS
   AGENT_PERFORMANCE
-  CUSTOM
+  CUSTOMER_SATISFACTION
+  OPERATIONAL_METRICS
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TicketCategory {
+  TECHNICAL
+  BILLING
+  APPOINTMENT
+  COMPLAINT
+  GENERAL
+  EMERGENCY
+  FEEDBACK
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+  CRITICAL
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_CUSTOMER
+  WAITING_AGENT
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+enum UserRole {
+  ADMIN
+  SUPERVISOR
+  AGENT
+  CORPORATE
+}
+
+enum doctor_status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum hospital_status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PrescriptionStatus {
+  ACTIVE
+  REVISED
+  CANCELLED
+  COMPLETED
+}
+
+enum sessionstatus {
+  SCHEDULED
+  PAUSED
+  ONGOING
+  ENDED
 }
