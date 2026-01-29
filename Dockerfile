@@ -36,9 +36,13 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
-# Copy application files (JavaScript server + services, NO TypeScript src/)
+# Copy application files (JavaScript server + services + scripts, NO TypeScript src/)
 COPY server-simple.js ./
 COPY services ./services/
+COPY scripts ./scripts/
+
+# Create backups directory
+RUN mkdir -p /app/backups && chown -R nodejs:nodejs /app/backups
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
