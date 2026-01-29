@@ -18,3 +18,7 @@ uploads
 test-*.js
 scripts
 *.log
+src
+tsconfig.json
+.eslintrc.js
+.prettierrc.js
