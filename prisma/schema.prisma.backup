@@ -4,13 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
-
-// ============================================================================
-// CORE E-CHANNELING MODELS
-// ============================================================================
 
 model Nurse {
   id                 String    @id @default(cuid())
@@ -52,11 +48,6 @@ model User {
   lastLoginAt                                              DateTime?
   createdAt                                                DateTime             @default(now())
   updatedAt                                                DateTime             @updatedAt
-  
-  // Corporate Agent Module Relations
-  agent                                                    Agent?
-  
-  // E-Channeling Relations
   activity_logs                                            activity_logs[]
   appointments                                             Appointment[]
   corporate_packages_corporate_packages_corporateIdTousers corporate_packages[] @relation("corporate_packages_corporateIdTousers")
@@ -73,144 +64,29 @@ model User {
   @@map("users")
 }
 
-// ============================================================================
-// CORPORATE AGENT MODULE MODELS
-// ============================================================================
-
-model Agent {
-  id                      String                   @id @default(cuid())
-  name                    String
-  companyName             String?
-  email                   String
-  phone                   String?
-  address                 String?
-  isActive                Boolean                  @default(true)
-  userId                  String                   @unique
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
-  user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  agent_appointments      AgentAppointment[]
-  agent_integrations      AgentIntegration[]
-  agent_payments          AgentPayment[]
-  agent_reports           AgentReport[]
-
-  @@map("agents")
-}
-
-model AgentAppointment {
-  id                 String                     @id @default(cuid())
-  agentId            String
-  doctorId           String
-  patientName        String
-  patientNIC         String?
-  patientEmail       String
-  patientPhone       String
-  date               DateTime
-  timeSlot           String
-  status             AgentAppointmentStatus     @default(PENDING)
-  amount             Float
-  paymentMethod      AgentPaymentMethod         @default(BILL_TO_PHONE)
-  sltPhoneNumber     String?
-  employeeNIC        String?
-  notes              String?
-  cancelReason       String?
-  paymentId          String?                    @unique
-  createdAt          DateTime                   @default(now())
-  updatedAt          DateTime                   @updatedAt
-  agent              Agent                      @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  doctor             Doctor                     @relation(fields: [doctorId], references: [id])
-  payment            AgentPayment?              @relation(fields: [paymentId], references: [id])
-
-  @@map("agent_appointments")
-}
-
-model AgentPayment {
-  id                String                @id @default(cuid())
-  amount            Float
-  status            AgentPaymentStatus    @default(PENDING)
-  method            AgentPaymentMethod    @default(BILL_TO_PHONE)
-  transactionId     String?               @unique
-  agentId           String?
-  notes             String?
-  processedAt       DateTime?
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-  appointment       AgentAppointment?
-  agent             Agent?                @relation(fields: [agentId], references: [id])
-
-  @@map("agent_payments")
-}
-
-model AgentReport {
-  id         String           @id @default(cuid())
-  agentId    String
-  type       AgentReportType
-  title      String
-  data       Json
-  parameters Json?
-  fileUrl    String?
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
-  agent      Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  @@map("agent_reports")
-}
-
-model AgentIntegration {
-  id         String    @id @default(cuid())
-  agentId    String
-  name       String
-  provider   String
-  apiKey     String
-  secretKey  String?
-  config     Json?
-  isActive   Boolean   @default(true)
-  lastUsedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  agent      Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  @@map("agent_integrations")
-}
-
-model RefreshToken {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  userId    String
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@map("refresh_tokens")
-}
-
-// ============================================================================
-// E-CHANNELING CONTINUED
-// ============================================================================
-
 model Doctor {
-  id                String           @id @default(cuid())
-  name              String
-  email             String           @unique
-  specialization    String
-  qualification     String
-  experience        Int
-  phonenumber       String
-  consultationFee   Decimal          @db.Decimal(10, 2)
-  rating            Decimal?         @db.Decimal(3, 2)
-  profileImage      String?
-  description       String?
-  languages         String[]
-  availableDays     String[]
-  isActive          Boolean          @default(true)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  status            doctor_status    @default(PENDING)
-  hospitalId        String[]         @default([]) @map("hospitalIds")
-  agentAppointments AgentAppointment[]
-  hospitals         DoctorHospital[]
-  prescriptions     Prescription[]
-  sessions          Session[]
-  time_slots        time_slots[]
+  id              String           @id @default(cuid())
+  name            String
+  email           String           @unique
+  specialization  String
+  qualification   String
+  experience      Int
+  phonenumber     String
+  consultationFee Decimal          @db.Decimal(10, 2)
+  rating          Decimal?         @db.Decimal(3, 2)
+  profileImage    String?
+  description     String?
+  languages       String[]
+  availableDays   String[]
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  status          doctor_status    @default(PENDING)
+  hospitalId      String[]         @default([]) @map("hospitalIds")
+  hospitals       DoctorHospital[]
+  prescriptions   Prescription[]
+  sessions        Session[]
+  time_slots      time_slots[]
 
   @@map("doctors")
 }
@@ -541,6 +417,7 @@ model patient_devices {
   @@index([patient_id], map: "idx_patient_devices_patient_id")
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model patient_feedback {
   id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   patient_id             String?   @db.VarChar(255)
@@ -583,6 +460,7 @@ model patient_history {
   @@index([visit_date], map: "idx_patient_history_visit_date")
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model patients {
   id                        Int       @id @default(autoincrement())
   patient_name              String
@@ -766,10 +644,6 @@ model DoctorHospital {
   @@map("doctor_hospitals")
 }
 
-// ============================================================================
-// ENUMS - E-CHANNELING
-// ============================================================================
-
 enum AppointmentStatus {
   CONFIRMED
   CANCELLED
@@ -935,38 +809,4 @@ enum sessionstatus {
   PAUSED
   ONGOING
   ENDED
-}
-
-// ============================================================================
-// ENUMS - CORPORATE AGENT MODULE
-// ============================================================================
-
-enum AgentAppointmentStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
-  COMPLETED
-  NO_SHOW
-}
-
-enum AgentPaymentStatus {
-  PENDING
-  PAID
-  FAILED
-  REFUNDED
-  CANCELLED
-}
-
-enum AgentPaymentMethod {
-  BILL_TO_PHONE
-  DEDUCT_FROM_SALARY
-}
-
-enum AgentReportType {
-  APPOINTMENTS
-  REVENUE
-  DOCTOR_PERFORMANCE
-  HOSPITAL_ANALYTICS
-  AGENT_PERFORMANCE
-  CUSTOM
 }

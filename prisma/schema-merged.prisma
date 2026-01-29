@@ -118,7 +118,6 @@ model AgentAppointment {
   createdAt          DateTime                   @default(now())
   updatedAt          DateTime                   @updatedAt
   agent              Agent                      @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  doctor             Doctor                     @relation(fields: [doctorId], references: [id])
   payment            AgentPayment?              @relation(fields: [paymentId], references: [id])
 
   @@map("agent_appointments")
@@ -188,29 +187,28 @@ model RefreshToken {
 // ============================================================================
 
 model Doctor {
-  id                String           @id @default(cuid())
-  name              String
-  email             String           @unique
-  specialization    String
-  qualification     String
-  experience        Int
-  phonenumber       String
-  consultationFee   Decimal          @db.Decimal(10, 2)
-  rating            Decimal?         @db.Decimal(3, 2)
-  profileImage      String?
-  description       String?
-  languages         String[]
-  availableDays     String[]
-  isActive          Boolean          @default(true)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  status            doctor_status    @default(PENDING)
-  hospitalId        String[]         @default([]) @map("hospitalIds")
-  agentAppointments AgentAppointment[]
-  hospitals         DoctorHospital[]
-  prescriptions     Prescription[]
-  sessions          Session[]
-  time_slots        time_slots[]
+  id              String           @id @default(cuid())
+  name            String
+  email           String           @unique
+  specialization  String
+  qualification   String
+  experience      Int
+  phonenumber     String
+  consultationFee Decimal          @db.Decimal(10, 2)
+  rating          Decimal?         @db.Decimal(3, 2)
+  profileImage    String?
+  description     String?
+  languages       String[]
+  availableDays   String[]
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  status          doctor_status    @default(PENDING)
+  hospitalId      String[]         @default([]) @map("hospitalIds")
+  hospitals       DoctorHospital[]
+  prescriptions   Prescription[]
+  sessions        Session[]
+  time_slots      time_slots[]
 
   @@map("doctors")
 }

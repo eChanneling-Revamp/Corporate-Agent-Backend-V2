@@ -249,7 +249,7 @@ app.post('/api/test/send-email', async (req, res) => {
       hospital: 'Nawaloka Hospital',
       date: 'November 2, 2024',
       time: '2:00 PM',
-      appointmentId: 'TEST-' + Date.now(),
+      data: { appointmentId: 'TEST-' + Date.now() },
       amount: 3500,
       corporateAgent: {
         companyName: 'ABC Insurance Company',
@@ -292,8 +292,8 @@ app.get('/api/doctors', async (req, res) => {
     const transformedDoctors = doctors.map((doctor) => ({
       id: doctor.id,
       name: doctor.name,
-      specialty: doctor.specialty,
-      hospital: doctor.hospital,
+      specialty: doctor.specialization,
+      hospital: 'General Hospital',
       rating: doctor.rating || 4.5,
       fee: doctor.consultationFee || 3000,
       photo: doctor.photoUrl || '/api/placeholder/150/150',
@@ -329,7 +329,7 @@ app.get('/api/appointments', async (req, res) => {
   try {
     console.log('API call to /api/appointments');
     
-    const appointments = await prisma.appointment.findMany({
+    const appointments = await prisma.agentAppointment.findMany({
       include: {
         doctor: true,
         payment: true
@@ -345,8 +345,8 @@ app.get('/api/appointments', async (req, res) => {
     const transformedAppointments = appointments.map((appointment) => ({
       id: appointment.id,
       doctorName: appointment.doctor.name,
-      specialty: appointment.doctor.specialty,
-      hospital: appointment.doctor.hospital,
+      specialty: appointment.doctor.specialization,
+      hospital: 'General Hospital', // Default since merged schema doesn't have simple hospital field
       patientName: appointment.patientName,
       patientEmail: appointment.patientEmail,
       patientPhone: appointment.patientPhone,
@@ -381,23 +381,23 @@ app.get('/api/dashboard', async (req, res) => {
     
     // Get appointment counts by status
     const [totalAppointments, pendingConfirmations, completedAppointments, cancelledAppointments] = await Promise.all([
-      prisma.appointment.count(),
-      prisma.appointment.count({ where: { status: 'PENDING' } }),
-      prisma.appointment.count({ where: { status: 'COMPLETED' } }),
-      prisma.appointment.count({ where: { status: 'CANCELLED' } })
+      prisma.agentAppointment.count(),
+      prisma.agentAppointment.count({ where: { status: 'PENDING' } }),
+      prisma.agentAppointment.count({ where: { status: 'COMPLETED' } }),
+      prisma.agentAppointment.count({ where: { status: 'CANCELLED' } })
     ]);
 
     // Get revenue from CONFIRMED appointments (as per requirements)
-    const revenueData = await prisma.appointment.aggregate({
+    const revenueData = await prisma.agentAppointment.aggregate({
       where: { status: 'CONFIRMED' },
       _sum: { amount: true }
     });
 
     console.log('Revenue calculated from confirmed appointments:', revenueData._sum.amount);
 
-    // Get active doctors count
+    // Get active doctors count - using status: 'APPROVED' for new schema
     const activeDoctors = await prisma.doctor.count({
-      where: { isActive: true }
+      where: { status: 'APPROVED' }
     });
 
     // Calculate growth percentages based on time periods
@@ -407,10 +407,10 @@ app.get('/api/dashboard', async (req, res) => {
 
     // Appointments growth (last 30 days vs previous 30 days)
     const [appointmentsLast30Days, appointmentsPrevious30Days] = await Promise.all([
-      prisma.appointment.count({
+      prisma.agentAppointment.count({
         where: { createdAt: { gte: thirtyDaysAgo } }
       }),
-      prisma.appointment.count({
+      prisma.agentAppointment.count({
         where: { 
           createdAt: { 
             gte: sixtyDaysAgo,
@@ -426,14 +426,14 @@ app.get('/api/dashboard', async (req, res) => {
 
     // Revenue growth (last 30 days vs previous 30 days)
     const [revenueLast30Days, revenuePrevious30Days] = await Promise.all([
-      prisma.appointment.aggregate({
+      prisma.agentAppointment.aggregate({
         where: { 
           status: 'CONFIRMED',
           createdAt: { gte: thirtyDaysAgo }
         },
         _sum: { amount: true }
       }),
-      prisma.appointment.aggregate({
+      prisma.agentAppointment.aggregate({
         where: { 
           status: 'CONFIRMED',
           createdAt: { 
@@ -682,7 +682,7 @@ app.post('/api/auth/logout', async (req, res) => {
 // Missing API endpoints that frontend expects
 app.get('/api/appointments/unpaid', async (req, res) => {
   try {
-    const appointments = await prisma.appointment.findMany({
+    const appointments = await prisma.agentAppointment.findMany({
       where: {
         AND: [
           {
@@ -710,8 +710,8 @@ app.get('/api/appointments/unpaid', async (req, res) => {
     const transformedAppointments = appointments.map((appointment) => ({
       id: appointment.id,
       doctorName: appointment.doctor.name,
-      specialty: appointment.doctor.specialty,
-      hospital: appointment.doctor.hospital,
+      specialty: appointment.doctor.specialization,
+      hospital: 'General Hospital',
       patientName: appointment.patientName,
       patientEmail: appointment.patientEmail,
       patientPhone: appointment.patientPhone,
@@ -781,7 +781,7 @@ app.post('/api/appointments', optionalAuth, async (req, res) => {
       });
     }
     
-    const appointment = await prisma.appointment.create({
+    const appointment = await prisma.agentAppointment.create({
       data: {
         agentId: agent.id,
         doctorId,
@@ -816,11 +816,11 @@ app.post('/api/appointments', optionalAuth, async (req, res) => {
         patientEmail: appointment.patientEmail,
         patientPhone: appointment.patientPhone,
         doctorName: appointment.doctor.name,
-        specialty: appointment.doctor.specialty,
-        hospital: appointment.doctor.hospital,
+        specialty: appointment.doctor.specialization,
+        hospital: 'General Hospital',
         date: appointment.date.toDateString(),
         time: appointment.timeSlot,
-        appointmentId: appointment.id,
+        data: { appointmentId: appointment.id },
         amount: appointment.amount,
         paymentMethod: appointment.paymentMethod,
         corporateAgent: {
@@ -849,13 +849,14 @@ app.post('/api/appointments', optionalAuth, async (req, res) => {
 
     // Create notification for agent
     try {
-      await prisma.notification.create({
+      await prisma.notifications.create({
         data: {
-          agentId: agent.id,
+          id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          userId: agent.userId,
           type: 'APPOINTMENT_RECEIVED',
           title: 'New Appointment Received',
           message: `${appointment.patientName} booked an appointment with ${appointment.doctor.name} for ${appointment.date.toDateString()} at ${appointment.timeSlot}`,
-          appointmentId: appointment.id
+          data: { appointmentId: appointment.id }
         }
       });
       console.log('✅ Notification created for appointment');
@@ -902,7 +903,7 @@ app.post('/api/appointments/bulk', optionalAuth, async (req, res) => {
       });
       
       if (doctor) {
-        const appointment = await prisma.appointment.create({
+        const appointment = await prisma.agentAppointment.create({
           data: {
             agentId: agent.id,
             doctorId: doctor.id,
@@ -932,11 +933,11 @@ app.post('/api/appointments/bulk', optionalAuth, async (req, res) => {
             patientEmail: appointment.patientEmail,
             patientPhone: appointment.patientPhone,
             doctorName: appointment.doctor.name,
-            specialty: appointment.doctor.specialty,
-            hospital: appointment.doctor.hospital,
+            specialty: appointment.doctor.specialization,
+            hospital: 'General Hospital',
             date: appointment.date.toDateString(),
             time: appointment.timeSlot,
-            appointmentId: appointment.id,
+            data: { appointmentId: appointment.id },
             amount: appointment.amount,
             paymentMethod: appointment.paymentMethod,
             corporateAgent: {
@@ -963,9 +964,10 @@ app.post('/api/appointments/bulk', optionalAuth, async (req, res) => {
 
     // Create notification for bulk booking
     try {
-      await prisma.notification.create({
+      await prisma.notifications.create({
         data: {
-          agentId: agent.id,
+          id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          userId: agent.userId,
           type: 'APPOINTMENT_RECEIVED',
           title: 'Bulk Appointments Created',
           message: `Successfully created ${createdAppointments.length} appointments in bulk booking`
@@ -1004,7 +1006,7 @@ app.post('/api/appointments/:id/confirm', async (req, res) => {
     const { id } = req.params;
     
     // Get appointment with full details for email
-    const existingAppointment = await prisma.appointment.findUnique({
+    const existingAppointment = await prisma.agentAppointment.findUnique({
       where: { id },
       include: {
         doctor: true,
@@ -1020,7 +1022,7 @@ app.post('/api/appointments/:id/confirm', async (req, res) => {
     }
 
     // Create payment record for this appointment
-    const payment = await prisma.payment.create({
+    const payment = await prisma.agentPayment.create({
       data: {
         amount: existingAppointment.amount,
         status: 'PAID',
@@ -1032,7 +1034,7 @@ app.post('/api/appointments/:id/confirm', async (req, res) => {
     });
 
     // Update appointment status and link to payment
-    const appointment = await prisma.appointment.update({
+    const appointment = await prisma.agentAppointment.update({
       where: { id },
       data: { 
         status: 'CONFIRMED',
@@ -1052,11 +1054,11 @@ app.post('/api/appointments/:id/confirm', async (req, res) => {
         patientEmail: appointment.patientEmail,
         patientPhone: appointment.patientPhone,
         doctorName: appointment.doctor.name,
-        specialty: appointment.doctor.specialty,
-        hospital: appointment.doctor.hospital,
+        specialty: appointment.doctor.specialization,
+        hospital: 'General Hospital',
         date: appointment.date.toDateString(),
         time: appointment.timeSlot,
-        appointmentId: appointment.id,
+        data: { appointmentId: appointment.id },
         amount: appointment.amount,
         paymentMethod: appointment.paymentMethod,
         corporateAgent: {
@@ -1085,13 +1087,15 @@ app.post('/api/appointments/:id/confirm', async (req, res) => {
 
     // Create notification for confirmation
     try {
-      await prisma.notification.create({
+      const agent = await prisma.agent.findFirst({ where: { id: appointment.agentId } });
+      await prisma.notifications.create({
         data: {
-          agentId: appointment.agentId,
+          id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          userId: agent.userId,
           type: 'APPOINTMENT_CONFIRMED',
           title: 'Appointment Confirmed',
           message: `Appointment for ${appointment.patientName} with ${appointment.doctor.name} has been confirmed for ${appointment.date.toDateString()} at ${appointment.timeSlot}`,
-          appointmentId: appointment.id
+          data: { appointmentId: appointment.id }
         }
       });
       console.log('✅ Notification created for appointment confirmation');
@@ -1129,7 +1133,7 @@ app.post('/api/appointments/:id/cancel', async (req, res) => {
     }
 
     // Get appointment with full details for email
-    const existingAppointment = await prisma.appointment.findUnique({
+    const existingAppointment = await prisma.agentAppointment.findUnique({
       where: { id },
       include: {
         doctor: true,
@@ -1145,7 +1149,7 @@ app.post('/api/appointments/:id/cancel', async (req, res) => {
     }
     
     // Update appointment status
-    const appointment = await prisma.appointment.update({
+    const appointment = await prisma.agentAppointment.update({
       where: { id },
       data: { 
         status: 'CANCELLED',
@@ -1164,11 +1168,11 @@ app.post('/api/appointments/:id/cancel', async (req, res) => {
         patientEmail: appointment.patientEmail,
         patientPhone: appointment.patientPhone,
         doctorName: appointment.doctor.name,
-        specialty: appointment.doctor.specialty,
-        hospital: appointment.doctor.hospital,
+        specialty: appointment.doctor.specialization,
+        hospital: 'General Hospital',
         date: appointment.date.toDateString(),
         time: appointment.timeSlot,
-        appointmentId: appointment.id,
+        data: { appointmentId: appointment.id },
         amount: appointment.amount,
         cancelReason: reason.trim(),
         corporateAgent: {
@@ -1197,13 +1201,15 @@ app.post('/api/appointments/:id/cancel', async (req, res) => {
 
     // Create notification for cancellation
     try {
-      await prisma.notification.create({
+      const agent = await prisma.agent.findFirst({ where: { id: appointment.agentId } });
+      await prisma.notifications.create({
         data: {
-          agentId: appointment.agentId,
+          id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          userId: agent.userId,
           type: 'APPOINTMENT_CANCELLED',
           title: 'Appointment Cancelled',
           message: `Appointment for ${appointment.patientName} with ${appointment.doctor.name} on ${appointment.date.toDateString()} at ${appointment.timeSlot} has been cancelled. Reason: ${reason.trim()}`,
-          appointmentId: appointment.id
+          data: { appointmentId: appointment.id }
         }
       });
       console.log('✅ Notification created for appointment cancellation');
@@ -1342,15 +1348,15 @@ app.get('/api/notifications', optionalAuth, async (req, res) => {
       });
     }
 
-    const notifications = await prisma.notification.findMany({
-      where: { agentId: agent.id },
+    const notifications = await prisma.notifications.findMany({
+      where: { userId: agent.userId },
       orderBy: { createdAt: 'desc' },
       take: 50 // Limit to 50 most recent
     });
 
-    const unreadCount = await prisma.notification.count({
+    const unreadCount = await prisma.notifications.count({
       where: {
-        agentId: agent.id,
+        userId: agent.userId,
         isRead: false
       }
     });
@@ -1375,7 +1381,7 @@ app.patch('/api/notifications/:id/read', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const notification = await prisma.notification.update({
+    const notification = await prisma.notifications.update({
       where: { id },
       data: { isRead: true }
     });
@@ -1408,9 +1414,9 @@ app.patch('/api/notifications/read-all', optionalAuth, async (req, res) => {
       });
     }
 
-    await prisma.notification.updateMany({
+    await prisma.notifications.updateMany({
       where: {
-        agentId: agent.id,
+        userId: agent.userId,
         isRead: false
       },
       data: { isRead: true }
@@ -1444,7 +1450,7 @@ app.get('/api/reports', optionalAuth, async (req, res) => {
       });
     }
 
-    const reports = await prisma.report.findMany({
+    const reports = await prisma.agentReport.findMany({
       where: { agentId: agent.id },
       orderBy: { createdAt: 'desc' }
     });
@@ -1498,7 +1504,7 @@ app.post('/api/reports/generate', optionalAuth, async (req, res) => {
     }
 
     // Fetch appointments for the date range
-    const appointments = await prisma.appointment.findMany({
+    const appointments = await prisma.agentAppointment.findMany({
       where: {
         agentId: agent.id,
         date: Object.keys(dateFilter).length > 0 ? dateFilter : undefined,
@@ -1519,11 +1525,11 @@ app.post('/api/reports/generate', optionalAuth, async (req, res) => {
       console.log('[REPORTS] Sample statuses:', appointments.slice(0, 5).map(a => ({ status: a.status, date: a.date, amount: a.amount, patient: a.patientName })));
     } else {
       // Debug: Let's check if there are ANY appointments for this agent
-      const totalForAgent = await prisma.appointment.count({ where: { agentId: agent.id } });
+      const totalForAgent = await prisma.agentAppointment.count({ where: { agentId: agent.id } });
       console.log('[REPORTS] DEBUG: Total appointments for this agent (no date filter):', totalForAgent);
       
       // Check a few recent appointments to see their dates
-      const recentApts = await prisma.appointment.findMany({
+      const recentApts = await prisma.agentAppointment.findMany({
         where: { agentId: agent.id },
         take: 5,
         orderBy: { date: 'desc' },
@@ -1547,7 +1553,7 @@ app.post('/api/reports/generate', optionalAuth, async (req, res) => {
             id: a.id,
             patientName: a.patientName,
             doctorName: a.doctor.name,
-            hospital: a.doctor.hospital,
+            hospital: 'General Hospital',
             date: a.date,
             status: a.status,
             amount: a.amount
@@ -1599,8 +1605,8 @@ app.post('/api/reports/generate', optionalAuth, async (req, res) => {
           if (!doctorStats[docName]) {
             doctorStats[docName] = {
               name: docName,
-              hospital: apt.doctor.hospital || 'Unknown',
-              specialty: apt.doctor.specialty || 'General',
+              hospital: 'General Hospital',
+              specialty: apt.doctor.specialization || 'General',
               totalAppointments: 0,
               confirmed: 0,
               cancelled: 0,
@@ -1644,7 +1650,7 @@ app.post('/api/reports/generate', optionalAuth, async (req, res) => {
     };
     const dbType = typeMapping[reportType] || (reportType ? reportType.toUpperCase() : 'APPOINTMENTS');
     
-    const report = await prisma.report.create({
+    const report = await prisma.agentReport.create({
       data: {
         agentId: agent.id,
         type: dbType,
@@ -1690,7 +1696,7 @@ app.get('/api/reports/:id', optionalAuth, async (req, res) => {
       });
     }
 
-    const report = await prisma.report.findFirst({
+    const report = await prisma.agentReport.findFirst({
       where: {
         id,
         agentId: agent.id
@@ -1732,7 +1738,7 @@ app.delete('/api/reports/:id', optionalAuth, async (req, res) => {
     }
 
     // Verify report belongs to agent
-    const report = await prisma.report.findFirst({
+    const report = await prisma.agentReport.findFirst({
       where: {
         id,
         agentId: agent.id
@@ -1746,7 +1752,7 @@ app.delete('/api/reports/:id', optionalAuth, async (req, res) => {
       });
     }
 
-    await prisma.report.delete({
+    await prisma.agentReport.delete({
       where: { id }
     });
 
@@ -1780,7 +1786,7 @@ app.get('/api/payments/stats', optionalAuth, async (req, res) => {
       });
     }
 
-    const payments = await prisma.payment.findMany({
+    const payments = await prisma.agentPayment.findMany({
       where: { agentId: agent.id },
       include: {
         appointment: true
@@ -1840,7 +1846,7 @@ app.get('/api/payments', optionalAuth, async (req, res) => {
       if (dateTo) whereClause.createdAt.lte = new Date(dateTo);
     }
 
-    const payments = await prisma.payment.findMany({
+    const payments = await prisma.agentPayment.findMany({
       where: whereClause,
       include: {
         appointment: {
@@ -1859,7 +1865,7 @@ app.get('/api/payments', optionalAuth, async (req, res) => {
     // Transform database payments to frontend format
     let transformedPayments = payments.map((payment) => ({
       id: payment.id,
-      appointmentId: payment.appointment?.id || 'N/A',
+      data: { appointmentId: payment.appointment?.id || 'N/A' },
       transactionId: payment.transactionId || `TXN-${payment.id.slice(0, 8)}`,
       method: payment.method.toLowerCase(),
       amount: payment.amount,
@@ -1912,7 +1918,7 @@ app.get('/api/payments/:id', optionalAuth, async (req, res) => {
       whereClause.agentId = agent.id;
     }
 
-    const payment = await prisma.payment.findFirst({
+    const payment = await prisma.agentPayment.findFirst({
       where: whereClause,
       include: {
         appointment: {
@@ -1934,7 +1940,7 @@ app.get('/api/payments/:id', optionalAuth, async (req, res) => {
       success: true,
       data: {
         id: payment.id,
-        appointmentId: payment.appointment?.id || 'N/A',
+        data: { appointmentId: payment.appointment?.id || 'N/A' },
         transactionId: payment.transactionId || `TXN-${payment.id.slice(0, 8)}`,
         method: payment.method.toLowerCase(),
         amount: payment.amount,
