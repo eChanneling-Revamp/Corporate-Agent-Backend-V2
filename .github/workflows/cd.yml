@@ -188,44 +188,45 @@ jobs:
           # Copy .env file to the server
           scp -P ${{ secrets.DEV_SERVER_SSH_PORT }} -o StrictHostKeyChecking=yes .env ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }}:~/corporate-agent-backend.env
 
-          # Execute remote deployment commands
-          ssh -p ${{ secrets.DEV_SERVER_SSH_PORT }} -o StrictHostKeyChecking=yes ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }} bash << 'REMOTE_EOF'
+          # Execute remote deployment commands with environment variables passed
+          ssh -p ${{ secrets.DEV_SERVER_SSH_PORT }} -o StrictHostKeyChecking=yes ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }} \
+            "GHCR_TOKEN='${GHCR_TOKEN}' GHCR_USERNAME='${GHCR_USERNAME}' IMAGE_NAME='${{ env.IMAGE_NAME }}' PORT='${{ vars.PORT }}' WS_PORT='${{ vars.WS_PORT }}' bash -s" << 'REMOTE_EOF'
           set -euo pipefail
 
-          IMAGE="ghcr.io/${{ env.IMAGE_NAME }}:latest"
+          IMAGE="ghcr.io/${IMAGE_NAME}:latest"
           CONTAINER="corporate-agent-backend"
           ENV_FILE="corporate-agent-backend.env"
 
           echo "Logging in to GitHub Container Registry"
           echo "${GHCR_TOKEN}" | podman login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
 
-          echo "Pulling image: \$IMAGE"
-          if ! podman pull "\$IMAGE"; then
+          echo "Pulling image: ${IMAGE}"
+          if ! podman pull "${IMAGE}"; then
             echo "Failed to pull image. Please check:"
-            echo "1. Image exists in ghcr.io/${{ env.IMAGE_NAME }}"
+            echo "1. Image exists in ghcr.io/${IMAGE_NAME}"
             echo "2. Package is public or GHCR_PAT secret has read:packages permission"
             echo "3. GHCR_USERNAME secret is set correctly"
             exit 1
           fi
 
           echo "Stopping existing container (if any)"
-          podman rm -f "\$CONTAINER" || true
+          podman rm -f "${CONTAINER}" || true
 
           echo "Waiting 5 seconds for port cleanup..."
           sleep 5
 
           echo "Starting new container"
           podman run -d \
-            --name "\$CONTAINER" \
+            --name "${CONTAINER}" \
             --replace \
             --restart=always \
-            --env-file "\$ENV_FILE" \
-            -p ${{ vars.PORT }}:${{ vars.PORT }} \
-            -p ${{ vars.WS_PORT }}:${{ vars.WS_PORT }} \
-            "\$IMAGE"
+            --env-file "${ENV_FILE}" \
+            -p ${PORT}:${PORT} \
+            -p ${WS_PORT}:${WS_PORT} \
+            "${IMAGE}"
 
           echo "Container status:"
-          podman ps -a --filter "name=\$CONTAINER"
+          podman ps -a --filter "name=${CONTAINER}"
 
           # Logout from registry
           podman logout ghcr.io
