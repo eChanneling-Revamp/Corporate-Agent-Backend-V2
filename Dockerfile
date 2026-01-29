@@ -41,12 +41,12 @@ COPY server-simple.js ./
 COPY services ./services/
 COPY scripts ./scripts/
 
-# Create backups directory
-RUN mkdir -p /app/backups && chown -R nodejs:nodejs /app/backups
-
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 && \
+    adduser -S nodejs -u 1001
+
+# Create backups directory and set permissions
+RUN mkdir -p /app/backups && \
     chown -R nodejs:nodejs /app
 
 # Switch to non-root user
