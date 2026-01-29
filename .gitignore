@@ -10,6 +10,10 @@ build/
 .env.local
 .env.production
 
+# Google Cloud credentials
+google-credentials.json
+service-account-key.json
+
 # Development files
 test-db.js
 add-db-endpoint.js
@@ -17,6 +21,11 @@ add-db-endpoint.js
 # Logs
 *.log
 logs
+
+# Backups (keep directory structure, ignore files)
+backups/*.sql
+backups/*.sql.gz
+backups/*.dump
 
 # IDE files
 .vscode/

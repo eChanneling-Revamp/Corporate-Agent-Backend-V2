@@ -2,6 +2,7 @@ import { createServer } from 'http';
 import app from './app';
 import { initWebSocket } from './utils/websocket';
 import { prisma } from './config/prisma';
+import { backupScheduler } from './services/backupScheduler';
 
 const PORT = process.env.PORT || 3001;
 const WS_PORT = process.env.WS_PORT || 3002;
@@ -28,6 +29,10 @@ const gracefulShutdown = async (signal: string): Promise<void> => {
   console.log(`\n${signal} received. Starting graceful shutdown...`);
   
   try {
+    // Stop backup scheduler
+    backupScheduler.stop();
+    console.log('✅ Backup scheduler stopped');
+
     // Close WebSocket server
     if (io) {
       io.close();
@@ -76,6 +81,12 @@ const startServer = async (): Promise<void> => {
   try {
     // Connect to database
     await connectDatabase();
+
+    // Start automated backup scheduler (weekly backups)
+    if (process.env.NODE_ENV === 'production' || process.env.ENABLE_AUTO_BACKUP === 'true') {
+      backupScheduler.start(); // Weekly backups
+      console.log('✅ Automated backup scheduler started (weekly backups)');
+    }
 
     // Start HTTP server
     server.listen(PORT, () => {

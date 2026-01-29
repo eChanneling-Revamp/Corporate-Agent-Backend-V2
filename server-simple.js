@@ -81,6 +81,8 @@ const authenticateToken = async (req, res, next) => {
     jwt.verify(token, accessSecret, async (err, decoded) => {
       if (err) {
         console.log('[AUTH] Token verification failed:', err.message);
+        console.log('[AUTH] Token preview:', token.substring(0, 30) + '...');
+        console.log('[AUTH] Secret used:', accessSecret.substring(0, 20) + '...');
         return res.status(403).json({
           success: false,
           message: 'Invalid or expired token'
@@ -1962,6 +1964,163 @@ app.get('/api/payments/:id', optionalAuth, async (req, res) => {
       success: false,
       message: 'Failed to fetch payment',
       error: error.message,
+    });
+  }
+});
+
+// ============================================
+// BACKUP API ENDPOINTS
+// ============================================
+
+const { createBackup, BACKUP_DIR } = require('./scripts/backup-database-nodejs');
+const fs = require('fs');
+const path = require('path');
+
+// Create database backup
+app.post('/api/backup/create', authenticateToken, async (req, res) => {
+  try {
+    console.log('[BACKUP] Creating database backup...');
+    const result = await createBackup();
+
+    if (result.success) {
+      res.json({
+        success: true,
+        message: 'Database backup created successfully',
+        data: {
+          fileName: result.fileName,
+          size: result.size,
+          timestamp: result.timestamp,
+          location: BACKUP_DIR
+        }
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Backup failed',
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('[BACKUP] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create backup',
+      error: error.message
+    });
+  }
+});
+
+// List all backups
+app.get('/api/backup/list', authenticateToken, async (req, res) => {
+  try {
+    if (!fs.existsSync(BACKUP_DIR)) {
+      return res.json({
+        success: true,
+        data: {
+          backups: [],
+          count: 0
+        }
+      });
+    }
+
+    const files = fs.readdirSync(BACKUP_DIR)
+      .filter(file => file.endsWith('.json'))
+      .map(file => {
+        const filePath = path.join(BACKUP_DIR, file);
+        const stats = fs.statSync(filePath);
+        return {
+          fileName: file,
+          size: stats.size,
+          sizeFormatted: `${(stats.size / (1024 * 1024)).toFixed(2)} MB`,
+          createdAt: stats.mtime,
+          path: filePath
+        };
+      })
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    res.json({
+      success: true,
+      data: {
+        backups: files,
+        count: files.length,
+        location: BACKUP_DIR
+      }
+    });
+  } catch (error) {
+    console.error('[BACKUP] Error listing backups:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to list backups',
+      error: error.message
+    });
+  }
+});
+
+// Download a backup
+app.get('/api/backup/download/:fileName', authenticateToken, (req, res) => {
+  try {
+    const { fileName } = req.params;
+
+    if (fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid filename'
+      });
+    }
+
+    const filePath = path.join(BACKUP_DIR, fileName);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Backup file not found'
+      });
+    }
+
+    res.download(filePath, fileName);
+  } catch (error) {
+    console.error('[BACKUP] Error downloading backup:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to download backup',
+      error: error.message
+    });
+  }
+});
+
+// Delete a backup
+app.delete('/api/backup/:fileName', authenticateToken, (req, res) => {
+  try {
+    const { fileName } = req.params;
+
+    if (fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid filename'
+      });
+    }
+
+    const filePath = path.join(BACKUP_DIR, fileName);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Backup file not found'
+      });
+    }
+
+    fs.unlinkSync(filePath);
+
+    res.json({
+      success: true,
+      message: 'Backup deleted successfully'
+    });
+  } catch (error) {
+    console.error('[BACKUP] Error deleting backup:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete backup',
+      error: error.message
     });
   }
 });

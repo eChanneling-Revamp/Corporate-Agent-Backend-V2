@@ -63,6 +63,14 @@ The backend is a production-ready RESTful API built with Node.js, Express.js, an
 - Performance metrics
 - *Note: Report generation service needed*
 
+### **Database Backup & Recovery** 🆕
+- **Automated weekly backups** of PostgreSQL database
+- **Manual backup creation** via terminal or UI
+- **Google Drive integration** for cloud backup storage
+- **Backup management** - list, download, delete backups
+- **Dual storage** - local + cloud for maximum protection
+- See [BACKUP.md](./BACKUP.md) for details
+
 ### **Security Features**
 - Helmet.js for security headers
 - CORS configuration
@@ -256,6 +264,7 @@ The system uses the following main entities:
 - `npm run test` - Run tests
 - `npm run db:reset` - Reset database
 - `npm run db:seed` - Seed database
+- `npm run db:backup` - Create database backup (local + Google Drive)
 
 ### Code Style
 
