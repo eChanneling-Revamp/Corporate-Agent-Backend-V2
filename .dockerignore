@@ -16,7 +16,6 @@ coverage
 !.env.example
 uploads
 test-*.js
-scripts
 *.log
 src
 tsconfig.json
