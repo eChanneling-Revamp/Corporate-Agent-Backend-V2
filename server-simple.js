@@ -1865,7 +1865,7 @@ app.get('/api/payments', optionalAuth, async (req, res) => {
     // Transform database payments to frontend format
     let transformedPayments = payments.map((payment) => ({
       id: payment.id,
-      data: { appointmentId: payment.appointment?.id || 'N/A' },
+      appointmentId: payment.appointment?.id || null,
       transactionId: payment.transactionId || `TXN-${payment.id.slice(0, 8)}`,
       method: payment.method.toLowerCase(),
       amount: payment.amount,
@@ -1877,7 +1877,7 @@ app.get('/api/payments', optionalAuth, async (req, res) => {
       patientEmail: payment.appointment?.patientEmail || '',
       patientPhone: payment.appointment?.patientPhone || '',
       hospital: payment.appointment?.doctor?.hospital || 'Unknown',
-      specialty: payment.appointment?.doctor?.specialty || 'Unknown',
+      specialty: payment.appointment?.doctor?.specialization || 'Unknown',
       notes: payment.notes
     }));
 
