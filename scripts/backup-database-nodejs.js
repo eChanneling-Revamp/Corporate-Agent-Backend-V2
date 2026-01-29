@@ -6,7 +6,6 @@
 const { PrismaClient } = require('@prisma/client');
 const fs = require('fs');
 const path = require('path');
-const googleDriveService = require('../services/googleDriveService');
 
 const prisma = new PrismaClient();
 const BACKUP_DIR = path.join(__dirname, '../backups');
@@ -129,22 +128,6 @@ async function createBackup() {
     // Clean up old backups
     cleanupOldBackups();
 
-    // Upload to Google Drive if enabled
-    let driveUpload = null;
-    if (process.env.ENABLE_GOOGLE_DRIVE_BACKUP === 'true') {
-      console.log('\n☁️  Uploading to Google Drive...');
-      driveUpload = await googleDriveService.uploadFile(backupFilePath, backupFileName);
-
-      if (driveUpload.success) {
-        console.log('✓ Successfully uploaded to Google Drive');
-        console.log(`  Link: ${driveUpload.webViewLink}`);
-        await googleDriveService.cleanupOldBackups(MAX_BACKUPS);
-      } else {
-        console.warn('⚠ Google Drive upload failed:', driveUpload.error);
-        console.warn('  Backup is still available locally');
-      }
-    }
-
     await prisma.$disconnect();
 
     return {
@@ -153,8 +136,7 @@ async function createBackup() {
       filePath: backupFilePath,
       size: stats.size,
       timestamp: new Date().toISOString(),
-      metadata: backup.metadata,
-      googleDrive: driveUpload
+      metadata: backup.metadata
     };
 
   } catch (error) {
