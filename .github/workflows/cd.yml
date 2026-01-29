@@ -186,10 +186,10 @@ jobs:
           echo "${{ secrets.ENV_FILE }}" > .env
 
           # Copy .env file to the server
-          scp -o StrictHostKeyChecking=yes deployment-server:~/corporate-agent-backend.env < .env
+          scp -P ${{ secrets.DEV_SERVER_SSH_PORT }} -o StrictHostKeyChecking=yes .env ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }}:~/corporate-agent-backend.env
 
           # Execute remote deployment commands
-          ssh -o StrictHostKeyChecking=yes deployment-server bash << REMOTE_EOF
+          ssh -p ${{ secrets.DEV_SERVER_SSH_PORT }} -o StrictHostKeyChecking=yes ${{ secrets.DEV_SERVER_USER }}@${{ secrets.DEV_SERVER_HOST }} bash << 'REMOTE_EOF'
           set -euo pipefail
 
           IMAGE="ghcr.io/${{ env.IMAGE_NAME }}:latest"
