@@ -1,16 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
-
-// ============================================================================
-// CORE E-CHANNELING MODELS
-// ============================================================================
 
 model Nurse {
   id                 String    @id @default(cuid())
@@ -52,12 +48,23 @@ model User {
   lastLoginAt                                              DateTime?
   createdAt                                                DateTime             @default(now())
   updatedAt                                                DateTime             @updatedAt
-  
-  // Corporate Agent Module Relations
-  agent                                                    Agent?
-  
-  // E-Channeling Relations
+  nicNumber                                                String?
+  passportNumber                                           String?
+  nationality                                              String?
+  userType                                                 String?
+  title                                                    String?
+  isNumberVerified                                         Boolean?
+  authUserId                                               String?              @unique @db.Uuid
+  age                                                      Int?
+  gender                                                   String?
+  medicalSpecs                                             String?
+  hospital                                                 String?
+  slmcNumber                                               Int?
+  employeeId                                               String?              @db.VarChar(255)
+  packageId                                                String?
+  acceptedTerms                                            Boolean?             @map("  acceptedTerms")
   activity_logs                                            activity_logs[]
+  agent                                                    Agent?
   appointments                                             Appointment[]
   corporate_packages_corporate_packages_corporateIdTousers corporate_packages[] @relation("corporate_packages_corporateIdTousers")
   corporate_packages_corporate_packages_createdByTousers   corporate_packages[] @relation("corporate_packages_createdByTousers")
@@ -69,89 +76,88 @@ model User {
   support_tickets_support_tickets_createdByIdTousers       support_tickets[]    @relation("support_tickets_createdByIdTousers")
   tasks                                                    tasks[]
   ticket_messages                                          ticket_messages[]
+  corporate_employees                                      corporate_employees? @relation(fields: [employeeId], references: [employeeid], onDelete: NoAction, onUpdate: NoAction, map: "fk_users_corporate_employees")
+  packages                                                 packages?            @relation(fields: [packageId], references: [packageId], onDelete: Restrict, onUpdate: NoAction, map: "fk_users_packages")
 
   @@map("users")
 }
 
-// ============================================================================
-// CORPORATE AGENT MODULE MODELS
-// ============================================================================
-
 model Agent {
-  id                      String                   @id @default(cuid())
-  name                    String
-  companyName             String?
-  email                   String
-  phone                   String?
-  address                 String?
-  isActive                Boolean                  @default(true)
-  userId                  String                   @unique
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
-  user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  agent_appointments      AgentAppointment[]
-  agent_integrations      AgentIntegration[]
-  agent_payments          AgentPayment[]
-  agent_reports           AgentReport[]
+  id                 String             @id @default(cuid())
+  name               String
+  companyName        String?
+  email              String
+  phone              String?
+  address            String?
+  isActive           Boolean            @default(true)
+  userId             String             @unique
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  agent_appointments AgentAppointment[]
+  agent_integrations AgentIntegration[]
+  agent_payments     AgentPayment[]
+  agent_reports      AgentReport[]
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointments       Appointment[]
 
   @@map("agents")
 }
 
 model AgentAppointment {
-  id                 String                     @id @default(cuid())
-  agentId            String
-  doctorId           String
-  patientName        String
-  patientNIC         String?
-  patientEmail       String
-  patientPhone       String
-  date               DateTime
-  timeSlot           String
-  status             AgentAppointmentStatus     @default(PENDING)
-  amount             Float
-  paymentMethod      AgentPaymentMethod         @default(BILL_TO_PHONE)
-  sltPhoneNumber     String?
-  employeeNIC        String?
-  notes              String?
-  cancelReason       String?
-  paymentId          String?                    @unique
-  createdAt          DateTime                   @default(now())
-  updatedAt          DateTime                   @updatedAt
-  agent              Agent                      @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  doctor             Doctor                     @relation(fields: [doctorId], references: [id])
-  payment            AgentPayment?              @relation(fields: [paymentId], references: [id])
+  id             String                 @id @default(cuid())
+  agentId        String
+  doctorId       String
+  patientName    String
+  patientNIC     String?
+  patientEmail   String
+  patientPhone   String
+  date           DateTime
+  timeSlot       String
+  status         AgentAppointmentStatus @default(PENDING)
+  amount         Float
+  paymentMethod  AgentPaymentMethod     @default(BILL_TO_PHONE)
+  sltPhoneNumber String?
+  employeeNIC    String?
+  notes          String?
+  cancelReason   String?
+  paymentId      String?                @unique
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  agent          Agent                  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  doctor         Doctor                 @relation(fields: [doctorId], references: [id])
+  payment        AgentPayment?          @relation(fields: [paymentId], references: [id])
 
   @@map("agent_appointments")
 }
 
 model AgentPayment {
-  id                String                @id @default(cuid())
-  amount            Float
-  status            AgentPaymentStatus    @default(PENDING)
-  method            AgentPaymentMethod    @default(BILL_TO_PHONE)
-  transactionId     String?               @unique
-  agentId           String?
-  notes             String?
-  processedAt       DateTime?
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-  appointment       AgentAppointment?
-  agent             Agent?                @relation(fields: [agentId], references: [id])
+  id            String             @id @default(cuid())
+  amount        Float
+  status        AgentPaymentStatus @default(PENDING)
+  method        AgentPaymentMethod @default(BILL_TO_PHONE)
+  transactionId String?            @unique
+  agentId       String?
+  notes         String?
+  processedAt   DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  appointment   AgentAppointment?
+  agent         Agent?             @relation(fields: [agentId], references: [id])
 
   @@map("agent_payments")
 }
 
 model AgentReport {
-  id         String           @id @default(cuid())
+  id         String          @id @default(cuid())
   agentId    String
   type       AgentReportType
   title      String
   data       Json
   parameters Json?
   fileUrl    String?
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
-  agent      Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  agent      Agent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@map("agent_reports")
 }
@@ -183,53 +189,53 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
-// ============================================================================
-// E-CHANNELING CONTINUED
-// ============================================================================
-
 model Doctor {
-  id                String           @id @default(cuid())
+  id                String             @id @default(cuid())
   name              String
-  email             String           @unique
+  email             String             @unique
   specialization    String
   qualification     String
   experience        Int
   phonenumber       String
-  consultationFee   Decimal          @db.Decimal(10, 2)
-  rating            Decimal?         @db.Decimal(3, 2)
+  consultationFee   Decimal            @db.Decimal(10, 2)
+  rating            Decimal?           @db.Decimal(3, 2)
   profileImage      String?
   description       String?
   languages         String[]
   availableDays     String[]
-  isActive          Boolean          @default(true)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  status            doctor_status    @default(PENDING)
-  hospitalId        String[]         @default([]) @map("hospitalIds")
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  status            doctor_status      @default(PENDING)
+  hospitalId        String[]           @default([]) @map("hospitalIds")
   agentAppointments AgentAppointment[]
   hospitals         DoctorHospital[]
   prescriptions     Prescription[]
   sessions          Session[]
   time_slots        time_slots[]
 
+  @@index([isActive], map: "idx_doctors_isactive")
+  @@index([name], map: "idx_doctors_name")
+  @@index([specialization], map: "idx_doctors_specialization")
+  @@index([status], map: "idx_doctors_status")
   @@map("doctors")
 }
 
 model Nurse_Detail {
-  id            String    @id @default(cuid())
-  name          String
-  email         String    @unique
-  experience    Int
-  phonenumber   String
-  profileImage  String?
-  availableDays String[]
-  isActive      Boolean   @default(true)
-  hospitalId    String
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  age           Int?
-  hospitals     Hospital  @relation(fields: [hospitalId], references: [id])
-  sessions      Session[]
+  id             String    @id @default(cuid())
+  name           String
+  email          String    @unique
+  experience     Int
+  phonenumber    String
+  profileImage   String?
+  availableDays  String[]
+  isActive       Boolean   @default(true)
+  hospitalId     String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  age            Int?
+  currentSession String?
+  sessions       Session[]
 
   @@map("nurse_details")
 }
@@ -249,31 +255,39 @@ model Hospital {
   updatedAt     DateTime         @updatedAt
   status        hospital_status  @default(PENDING)
   profileImage  String?
+  hospitalType  String?
   doctors       DoctorHospital[]
-  nurse_details Nurse_Detail[]
   nurses        Nurse[]
   sessions      Session[]
 
+  @@index([district], map: "idx_hospitals_district")
+  @@index([hospitalType], map: "idx_hospitals_hospitaltype")
+  @@index([name], map: "idx_hospitals_name")
   @@map("hospitals")
 }
 
 model Session {
-  id            String        @id @default(cuid())
-  doctorId      String
-  nurseId       String
-  capacity      Int           @default(5)
-  location      String
-  hospitalId    String
-  status        sessionstatus @default(SCHEDULED)
-  createdAt     DateTime      @default(now()) @db.Timestamp(6)
-  scheduledAt   DateTime      @db.Timestamp(6)
-  startTime     DateTime      @db.Timestamp(6)
-  endTime       DateTime      @db.Timestamp(6)
-  appointments  Appointment[]
-  doctors       Doctor        @relation(fields: [doctorId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "doctorId")
-  hospitals     Hospital      @relation(fields: [hospitalId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "hospitalId")
-  nurse_details Nurse_Detail  @relation(fields: [nurseId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "nurseId")
+  id                   String        @id @default(cuid())
+  doctorId             String
+  nurseId              String
+  capacity             Int           @default(5)
+  location             String
+  hospitalId           String
+  status               sessionstatus @default(SCHEDULED)
+  createdAt            DateTime      @default(now()) @db.Timestamp(6)
+  scheduledAt          DateTime      @db.Timestamp(6)
+  startTime            DateTime      @db.Timestamp(6)
+  endTime              DateTime      @db.Timestamp(6)
+  currentRunningNumber String?
+  duration             DateTime?     @db.Timestamp(6)
+  appointments         Appointment[]
+  doctors              Doctor        @relation(fields: [doctorId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "doctorId")
+  hospitals            Hospital      @relation(fields: [hospitalId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "hospitalId")
+  nurse_details        Nurse_Detail  @relation(fields: [nurseId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "nurseId")
 
+  @@index([doctorId], map: "idx_sessions_doctor_id")
+  @@index([hospitalId], map: "idx_sessions_hospital_id")
+  @@index([scheduledAt], map: "idx_sessions_scheduled_at")
   @@map("sessions")
 }
 
@@ -294,7 +308,7 @@ model Appointment {
   insuranceProvider              String?
   insurancePolicyNumber          String?
   isNewPatient                   Boolean                          @default(true)
-  bookedById                     String
+  bookedById                     String?
   estimatedWaitTime              Int?
   queuePosition                  Int?
   status                         AppointmentStatus                @default(CONFIRMED)
@@ -307,8 +321,11 @@ model Appointment {
   createdAt                      DateTime                         @default(now())
   updatedAt                      DateTime                         @updatedAt
   sessionId                      String
-  users                          User                             @relation(fields: [bookedById], references: [id])
+  medicalReportUrl               String?
+  agentId                        String?
+  users                          User?                            @relation(fields: [bookedById], references: [id], onDelete: Restrict, map: "appointments_bookedbyid_fkey")
   session                        Session                          @relation(fields: [sessionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  agents                         Agent?                           @relation(fields: [agentId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_appointments_agent")
   corporate_package_appointments corporate_package_appointments[]
   notification_logs              notification_logs[]
   payments                       payments[]
@@ -316,6 +333,10 @@ model Appointment {
 
   @@index([status], map: "idx_appointments_status")
   @@index([patientEmail], map: "idx_appointments_patient_email")
+  @@index([bookedById], map: "idx_appointments_bookedbyid")
+  @@index([createdAt], map: "idx_appointments_createdat")
+  @@index([sessionId], map: "idx_appointments_sessionid")
+  @@index([status, createdAt], map: "idx_appointments_status_createdat")
   @@map("appointments")
 }
 
@@ -607,6 +628,7 @@ model patients {
   marked_no_show_at         DateTime? @db.Timestamp(6)
   no_show_reason            String?
   email                     String?   @db.VarChar(255)
+  dateOfBirth               DateTime? @db.Timestamp(6)
 
   @@unique([session_id, running_number])
   @@index([created_at], map: "idx_patients_created_at")
@@ -763,12 +785,27 @@ model DoctorHospital {
   hospital   Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
 
   @@unique([doctorId, hospitalId])
+  @@index([doctorId], map: "idx_doctor_hospitals_doctorid")
+  @@index([hospitalId], map: "idx_doctor_hospitals_hospitalid")
   @@map("doctor_hospitals")
 }
 
-// ============================================================================
-// ENUMS - E-CHANNELING
-// ============================================================================
+model corporate_employees {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employeeid   String    @unique @db.VarChar(255)
+  hospitalname String    @db.VarChar(255)
+  isactive     Boolean?  @default(true)
+  createdat    DateTime? @default(now()) @db.Timestamp(6)
+  users        User[]
+}
+
+model packages {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  packageId   String    @unique
+  packageName String
+  createdAt   DateTime? @default(now()) @db.Timestamp(6)
+  users       User[]
+}
 
 enum AppointmentStatus {
   CONFIRMED
@@ -909,6 +946,7 @@ enum UserRole {
   SUPERVISOR
   AGENT
   CORPORATE
+  PATIENT
 }
 
 enum doctor_status {
@@ -936,10 +974,6 @@ enum sessionstatus {
   ONGOING
   ENDED
 }
-
-// ============================================================================
-// ENUMS - CORPORATE AGENT MODULE
-// ============================================================================
 
 enum AgentAppointmentStatus {
   PENDING
@@ -969,4 +1003,11 @@ enum AgentReportType {
   HOSPITAL_ANALYTICS
   AGENT_PERFORMANCE
   CUSTOM
+}
+
+enum session_status_list {
+  SCHEDULED
+  ONGOING
+  PAUSED
+  ENDED
 }
