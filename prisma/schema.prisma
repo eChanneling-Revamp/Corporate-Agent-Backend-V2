@@ -8,30 +8,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Nurse {
-  id                 String    @id @default(cuid())
-  fullName           String
-  email              String
-  password           String    @db.VarChar
-  experience         String?
-  createdAt          DateTime  @db.Time(6)
-  hospitalId         String?
-  active             String?
-  currentSession     String?
-  profilePhoto       String?
-  updatedAt          DateTime? @updatedAt @db.Timestamp(6)
-  passwordChangedAt  DateTime? @db.Date
-  twoFactorEnabled   Boolean?
-  twoFactorMethod    String?
-  twoFactorUpdatedAt DateTime? @db.Date
-  phone              String?   @db.VarChar(20)
-  username           String?
-  age                String?
-  hospitals          Hospital? @relation(fields: [hospitalId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "hospitalId")
-
-  @@map("nurses")
-}
-
 model User {
   id                                                       String               @id @default(cuid())
   email                                                    String               @unique
@@ -257,7 +233,6 @@ model Hospital {
   profileImage  String?
   hospitalType  String?
   doctors       DoctorHospital[]
-  nurses        Nurse[]
   sessions      Session[]
 
   @@index([district], map: "idx_hospitals_district")
@@ -323,6 +298,7 @@ model Appointment {
   sessionId                      String
   medicalReportUrl               String?
   agentId                        String?
+  patientAge                     Int?                             @map(" patientAge")
   users                          User?                            @relation(fields: [bookedById], references: [id], onDelete: Restrict, map: "appointments_bookedbyid_fkey")
   session                        Session                          @relation(fields: [sessionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   agents                         Agent?                           @relation(fields: [agentId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_appointments_agent")
@@ -602,40 +578,6 @@ model patient_history {
   @@index([patient_id], map: "idx_patient_history_patient_id")
   @@index([phone], map: "idx_patient_history_phone")
   @@index([visit_date], map: "idx_patient_history_visit_date")
-}
-
-model patients {
-  id                        Int       @id @default(autoincrement())
-  patient_name              String
-  phone                     String
-  age                       Int?
-  emergency_contact         String?
-  session_id                String
-  running_number            Int
-  source                    String
-  status                    String
-  created_at                DateTime? @default(now()) @db.Timestamp(6)
-  is_extra                  Boolean?  @default(false)
-  wait_start_time           DateTime? @db.Timestamp(6)
-  wait_end_time             DateTime? @db.Timestamp(6)
-  wait_time_minutes         Int?
-  cancellation_reason       String?
-  cancelled_at              DateTime? @db.Timestamp(6)
-  cancelled_by              String?   @db.VarChar(255)
-  consultation_start_time   DateTime? @db.Timestamp(6)
-  consultation_end_time     DateTime? @db.Timestamp(6)
-  consultation_time_minutes Int?
-  marked_no_show_at         DateTime? @db.Timestamp(6)
-  no_show_reason            String?
-  email                     String?   @db.VarChar(255)
-  dateOfBirth               DateTime? @db.Timestamp(6)
-
-  @@unique([session_id, running_number])
-  @@index([created_at], map: "idx_patients_created_at")
-  @@index([is_extra], map: "idx_patients_is_extra")
-  @@index([running_number], map: "idx_patients_running_number")
-  @@index([session_id], map: "idx_patients_session_id")
-  @@index([status], map: "idx_patients_status")
 }
 
 model payments {
