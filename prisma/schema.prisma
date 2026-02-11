@@ -756,6 +756,11 @@ enum AppointmentStatus {
   NO_SHOW
   RESCHEDULED
   UNPAID
+  WAITING
+  CALLED
+  SKIPPED
+  ABSENT
+  SERVED
 }
 
 enum PaymentStatus {
