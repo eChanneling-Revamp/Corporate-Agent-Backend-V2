@@ -82,12 +82,18 @@ const startServer = async (): Promise<void> => {
     // Connect to database
     await connectDatabase();
 
-    // Start automated backup scheduler (daily at 12:00 AM)
+    // Start automated backup scheduler (daily at 7:00 PM)
     if (process.env.NODE_ENV === 'production' || process.env.ENABLE_AUTO_BACKUP === 'true') {
+      console.log('\n📦 BACKUP CONFIGURATION:');
+      console.log('   ✅ Auto-backup ENABLED (ENABLE_AUTO_BACKUP=true)');
+      console.log('   ⏰ Schedule: Daily at 7:00 PM');
+      console.log('   📂 Local storage: backend/backups/ (max 10 files)');
+      console.log('   ☁️  Google Drive: Enabled if configured');
+      console.log('   ⚠️  NOTE: Server must be running at 7:00 PM for auto-backup!\n');
       backupScheduler.start();
-      console.log('✅ Automated backup scheduler started (Daily at 12:00 AM)');
-      console.log('   - Database backups to Google Drive');
-      console.log('   - Prisma schema backups with db pull');
+    } else {
+      console.log('\n⚠️  BACKUP DISABLED:');
+      console.log('   Set ENABLE_AUTO_BACKUP=true in .env to enable\n');
     }
 
     // Start HTTP server
