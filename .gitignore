@@ -12,6 +12,8 @@ build/
 
 # Google Cloud credentials
 google-credentials.json
+google-oauth-credentials.json
+google-drive-token.json
 service-account-key.json
 
 # Development files

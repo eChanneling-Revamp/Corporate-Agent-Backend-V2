@@ -1,87 +1,134 @@
 /**
  * Backup Scheduler Service
- * Automatically creates database backups on a schedule
+ * Automatically creates database and Prisma schema backups on a schedule
+ * Uploads backups to Google Drive
  */
 
+import cron from 'node-cron';
 import { createBackup } from '../../scripts/backup-database-nodejs';
+import { backupPrismaSchema } from '../../scripts/backup-prisma-schema';
+import { googleDriveService } from './googleDriveService';
 import { logger } from '../utils/logger';
 
 class BackupScheduler {
-  private intervalId: NodeJS.Timeout | null = null;
-  private readonly WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+  private cronJob: cron.ScheduledTask | null = null;
+  private readonly CRON_SCHEDULE = '0 0 * * *'; // Daily at 12:00 AM (midnight)
 
   /**
    * Start the backup scheduler
-   * @param intervalMs - Interval in milliseconds (default: 1 week)
+   * Runs daily at 12:00 AM
    */
-  start(intervalMs: number = this.WEEK_IN_MS) {
-    if (this.intervalId) {
+  start() {
+    if (this.cronJob) {
       logger.warn('Backup scheduler is already running');
       return;
     }
 
-    logger.info(`Starting backup scheduler (interval: ${this.formatDuration(intervalMs)})`);
+    logger.info('Starting backup scheduler (Daily at 12:00 AM)');
 
-    // Run initial backup after 1 minute
+    // Run initial backup after 1 minute (for testing)
     setTimeout(() => {
       this.runBackup();
     }, 60000);
 
-    // Schedule recurring backups
-    this.intervalId = setInterval(() => {
+    // Schedule daily backups at 12:00 AM
+    this.cronJob = cron.schedule(this.CRON_SCHEDULE, () => {
       this.runBackup();
-    }, intervalMs);
+    }, {
+      timezone: process.env.TIMEZONE || 'UTC',
+    });
 
-    logger.info('✓ Backup scheduler started successfully');
+    logger.info('✓ Backup scheduler started successfully - Daily at 12:00 AM');
   }
 
   /**
    * Stop the backup scheduler
    */
   stop() {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
+    if (this.cronJob) {
+      this.cronJob.stop();
+      this.cronJob = null;
       logger.info('✓ Backup scheduler stopped');
     }
   }
 
   /**
-   * Run a backup immediately
+   * Run a complete backup (database + schema) and upload to Google Drive
    */
   async runBackup() {
     try {
-      logger.info('Starting scheduled database backup...');
-      const result = await createBackup();
+      logger.info('========================================');
+      logger.info('Starting scheduled backup process...');
+      logger.info('========================================');
 
-      if (result.success) {
-        logger.info('✓ Scheduled backup completed successfully', {
-          fileName: result.fileName,
-          size: `${(result.size / (1024 * 1024)).toFixed(2)} MB`,
-          timestamp: result.timestamp
+      const uploadFiles: string[] = [];
+      const results: any = {
+        database: null,
+        schema: null,
+        googleDrive: null,
+      };
+
+      // 1. Backup Database
+      logger.info('\n📊 Step 1: Backing up database...');
+      const dbResult = await createBackup();
+      results.database = dbResult;
+
+      if (dbResult.success) {
+        logger.info('✓ Database backup completed', {
+          fileName: dbResult.fileName,
+          size: `${(dbResult.size / (1024 * 1024)).toFixed(2)} MB`,
         });
+        uploadFiles.push(dbResult.filePath);
       } else {
-        logger.error('✗ Scheduled backup failed', { error: result.error });
+        logger.error('✗ Database backup failed', { error: dbResult.error });
       }
+
+      // 2. Backup Prisma Schema (with db pull)
+      logger.info('\n📝 Step 2: Backing up Prisma schema...');
+      const schemaResult = await backupPrismaSchema();
+      results.schema = schemaResult;
+
+      if (schemaResult.success) {
+        logger.info('✓ Prisma schema backup completed', {
+          fileName: schemaResult.fileName,
+          size: `${(schemaResult.size / 1024).toFixed(2)} KB`,
+        });
+        uploadFiles.push(schemaResult.filePath);
+      } else {
+        logger.error('✗ Prisma schema backup failed', { error: schemaResult.error });
+      }
+
+      // 3. Upload to Google Drive
+      if (uploadFiles.length > 0) {
+        logger.info('\n☁️  Step 3: Uploading backups to Google Drive...');
+        
+        const uploadResult = await googleDriveService.uploadFiles(uploadFiles);
+        results.googleDrive = uploadResult;
+
+        if (uploadResult.success) {
+          logger.info('✓ Files uploaded to Google Drive successfully', {
+            uploadedCount: uploadResult.uploadedCount,
+            totalFiles: uploadFiles.length,
+          });
+
+          // Clean up old backups from Google Drive
+          await googleDriveService.cleanupOldBackups(10);
+        } else {
+          logger.error('✗ Google Drive upload failed', { errors: uploadResult.errors });
+        }
+      }
+
+      // Summary
+      logger.info('\n========================================');
+      logger.info('Backup Process Summary:');
+      logger.info(`  Database: ${results.database?.success ? '✓' : '✗'}`);
+      logger.info(`  Schema: ${results.schema?.success ? '✓' : '✗'}`);
+      logger.info(`  Google Drive: ${results.googleDrive?.success ? '✓' : '✗'}`);
+      logger.info('========================================\n');
+
     } catch (error: any) {
       logger.error('Error running scheduled backup', { error: error.message });
     }
-  }
-
-  /**
-   * Format duration in human-readable format
-   */
-  private formatDuration(ms: number): string {
-    const days = Math.floor(ms / (24 * 60 * 60 * 1000));
-    const hours = Math.floor((ms % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
-    const minutes = Math.floor((ms % (60 * 60 * 1000)) / (60 * 1000));
-
-    const parts = [];
-    if (days > 0) parts.push(`${days}d`);
-    if (hours > 0) parts.push(`${hours}h`);
-    if (minutes > 0) parts.push(`${minutes}m`);
-
-    return parts.join(' ') || '0m';
   }
 
   /**
@@ -89,9 +136,10 @@ class BackupScheduler {
    */
   getStatus() {
     return {
-      running: this.intervalId !== null,
-      interval: this.WEEK_IN_MS,
-      intervalFormatted: this.formatDuration(this.WEEK_IN_MS)
+      running: this.cronJob !== null,
+      schedule: this.CRON_SCHEDULE,
+      scheduleDescription: 'Daily at 12:00 AM',
+      timezone: process.env.TIMEZONE || 'UTC',
     };
   }
 }

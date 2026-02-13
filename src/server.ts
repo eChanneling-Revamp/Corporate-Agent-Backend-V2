@@ -82,10 +82,12 @@ const startServer = async (): Promise<void> => {
     // Connect to database
     await connectDatabase();
 
-    // Start automated backup scheduler (weekly backups)
+    // Start automated backup scheduler (daily at 12:00 AM)
     if (process.env.NODE_ENV === 'production' || process.env.ENABLE_AUTO_BACKUP === 'true') {
-      backupScheduler.start(); // Weekly backups
-      console.log('✅ Automated backup scheduler started (weekly backups)');
+      backupScheduler.start();
+      console.log('✅ Automated backup scheduler started (Daily at 12:00 AM)');
+      console.log('   - Database backups to Google Drive');
+      console.log('   - Prisma schema backups with db pull');
     }
 
     // Start HTTP server
