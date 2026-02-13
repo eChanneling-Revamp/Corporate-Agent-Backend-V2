@@ -175,8 +175,6 @@ jobs:
             ServerAliveInterval 30
             ServerAliveCountMax 240
             TCPKeepAlive yes
-            ClientAliveInterval 30
-            ClientAliveCountMax 240
             Compression yes
           EOF
 
