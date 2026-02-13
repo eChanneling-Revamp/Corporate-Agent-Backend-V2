@@ -110,6 +110,9 @@ async function backupPrismaSchema() {
     console.log(`  File: ${backupFilePath}`);
     console.log(`  Size: ${fileSizeKB} KB`);
     console.log(`  Timestamp: ${new Date().toISOString()}`);
+    console.log(`\\n💾 LOCAL SCHEMA BACKUP SAVED!`);
+    console.log(`   Location: backend/backups/schemas/${backupFileName}`);
+    console.log(`   Max schema backups: ${MAX_SCHEMA_BACKUPS}\\n`);
 
     // Clean up old backups
     cleanupOldSchemaBackups();

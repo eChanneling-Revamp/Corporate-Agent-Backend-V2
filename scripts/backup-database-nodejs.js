@@ -124,6 +124,9 @@ async function createBackup() {
     console.log(`  Size: ${fileSizeMB} MB`);
     console.log(`  Tables: ${backup.metadata.tables}`);
     console.log(`  Records: ${backup.metadata.totalRecords}`);
+    console.log(`\n💾 LOCAL BACKUP SAVED: This file will be kept in your local folder!`);
+    console.log(`   Location: backend/backups/${backupFileName}`);
+    console.log(`   Max local backups: ${MAX_BACKUPS}\n`);
 
     // Clean up old backups
     cleanupOldBackups();

@@ -20,6 +20,7 @@
     "db:backup": "node scripts/backup-database-nodejs.js",
     "db:backup:sql": "node scripts/backup-database.js",
     "db:backup:schema": "node scripts/backup-prisma-schema.js",
+    "backup:status": "node scripts/check-backup-status.js",
     "gdrive:setup": "node scripts/setup-google-oauth.js",
     "gdrive:test": "node scripts/test-google-drive.js",
     "test": "jest",

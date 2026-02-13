@@ -12,11 +12,11 @@ import { logger } from '../utils/logger';
 
 class BackupScheduler {
   private cronJob: cron.ScheduledTask | null = null;
-  private readonly CRON_SCHEDULE = '0 0 * * *'; // Daily at 12:00 AM (midnight)
+  private readonly CRON_SCHEDULE = '0 19 * * *'; // Daily at 7:00 PM
 
   /**
    * Start the backup scheduler
-   * Runs daily at 12:00 AM
+   * Runs daily at 7:00 PM
    */
   start() {
     if (this.cronJob) {
@@ -24,21 +24,32 @@ class BackupScheduler {
       return;
     }
 
-    logger.info('Starting backup scheduler (Daily at 12:00 AM)');
+    const timezone = process.env.TIMEZONE || 'UTC';
+    logger.info('========================================');
+    logger.info('🕐 Starting backup scheduler');
+    logger.info(`   Schedule: Daily at 7:00 PM (${timezone})`);
+    logger.info(`   Cron Pattern: ${this.CRON_SCHEDULE}`);
+    logger.info(`   Local Backups: backend/backups/ (max 10)`);
+    logger.info(`   Schema Backups: backend/backups/schemas/ (max 10)`);
+    logger.info('========================================');
 
     // Run initial backup after 1 minute (for testing)
+    logger.info('⏳ Initial backup will run in 1 minute...');
     setTimeout(() => {
+      logger.info('🚀 Running initial backup test...');
       this.runBackup();
     }, 60000);
 
-    // Schedule daily backups at 12:00 AM
+    // Schedule daily backups at 7:00 PM
     this.cronJob = cron.schedule(this.CRON_SCHEDULE, () => {
+      logger.info('⏰ Scheduled backup triggered at 7:00 PM');
       this.runBackup();
     }, {
-      timezone: process.env.TIMEZONE || 'UTC',
+      timezone: timezone,
     });
 
-    logger.info('✓ Backup scheduler started successfully - Daily at 12:00 AM');
+    logger.info('✓ Backup scheduler started successfully');
+    logger.info('✓ Backups will be saved locally AND uploaded to Google Drive');
   }
 
   /**
@@ -120,10 +131,17 @@ class BackupScheduler {
 
       // Summary
       logger.info('\n========================================');
-      logger.info('Backup Process Summary:');
-      logger.info(`  Database: ${results.database?.success ? '✓' : '✗'}`);
-      logger.info(`  Schema: ${results.schema?.success ? '✓' : '✗'}`);
-      logger.info(`  Google Drive: ${results.googleDrive?.success ? '✓' : '✗'}`);
+      logger.info('📋 Backup Process Summary:');
+      logger.info(`  Database Backup: ${results.database?.success ? '✅ SUCCESS' : '❌ FAILED'}`);
+      if (results.database?.success) {
+        logger.info(`    └─ Location: backend/backups/${results.database.fileName}`);
+      }
+      logger.info(`  Schema Backup: ${results.schema?.success ? '✅ SUCCESS' : '❌ FAILED'}`);
+      if (results.schema?.success) {
+        logger.info(`    └─ Location: backend/backups/schemas/${results.schema.fileName}`);
+      }
+      logger.info(`  Google Drive Upload: ${results.googleDrive?.success ? '✅ SUCCESS' : '⚠️  SKIPPED/FAILED'}`);
+      logger.info('\n💾 ALL BACKUPS ARE KEPT LOCALLY IN backend/backups/ FOLDER');
       logger.info('========================================\n');
 
     } catch (error: any) {
@@ -138,7 +156,7 @@ class BackupScheduler {
     return {
       running: this.cronJob !== null,
       schedule: this.CRON_SCHEDULE,
-      scheduleDescription: 'Daily at 12:00 AM',
+      scheduleDescription: 'Daily at 7:00 PM',
       timezone: process.env.TIMEZONE || 'UTC',
     };
   }
