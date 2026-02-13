@@ -1,7 +1,0 @@
-# Backup files
-*.sql
-*.sql.gz
-*.dump
-
-# Keep this directory but ignore its contents
-!.gitkeep
